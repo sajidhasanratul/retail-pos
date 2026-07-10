@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RetailPOS Dashboard</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh; background: #f9fafb; }
+        /* Sidebar Styling */
+        .sidebar { width: 250px; background: #1e1b4b; color: white; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 1.5rem; font-size: 1.25rem; font-weight: bold; border-bottom: 1px solid #3730a3; display: flex; align-items: center; gap: 0.5rem; }
+        .nav-item { padding: 1rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; color: #c7d2fe; text-decoration: none; cursor: pointer; transition: 0.2s; }
+        .nav-item:hover { background: #312e81; color: white; }
+        .nav-item.hidden { display: none !important; }
+        /* Main Content */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .topbar { height: 60px; background: white; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; padding: 0 2rem; }
+        .content-area { padding: 2rem; overflow-y: auto; flex: 1; }
+        .logout-btn { background: none; border: none; cursor: pointer; color: #ef4444; font-weight: bold; display: flex; align-items: center; gap: 0.5rem; }
+    </style>
+
+    <link rel="stylesheet" href="css/responsive.css">
+
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/products.js"></script>
+    <script src="js/new-order.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/products.js"></script>
+    <script src="js/new-order.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/customers.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/sales-list.js"></script>
+    
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-header"><i data-lucide="store"></i> RetailPOS</div>
+        <!-- Items controlled by RBAC -->
+        <a class="nav-item" id="nav-dashboard"><i data-lucide="layout-dashboard"></i> POS Dashboard</a>
+        
+        <!-- Sales Module -->
+        <a class="nav-item" id="nav-sales-new" data-perm="sales.create"><i data-lucide="shopping-cart"></i> New Sale</a>
+        <a class="nav-item" id="nav-sales-list" data-perm="sales.view"><i data-lucide="list"></i> Sales List</a>
+        <a class="nav-item" id="nav-sales-return" data-perm="sales.return"><i data-lucide="corner-down-left"></i> Sales Return</a>
+        
+        <!-- Product Module -->
+        <a class="nav-item" id="nav-products" data-perm="products.view"><i data-lucide="package"></i> Products</a>
+        
+        <!-- Reports Module -->
+        <a class="nav-item" id="nav-reports" data-perm="reports.view"><i data-lucide="bar-chart-2"></i> Reports</a>
+        
+        <!-- Customers Module -->
+        <a class="nav-item" id="nav-customers" data-perm="customers.manage"><i data-lucide="users"></i> Customers</a>
+        
+        <!-- Admin Panel -->
+        <a class="nav-item" id="nav-admin" data-perm="users.manage"><i data-lucide="shield"></i> Admin Panel</a>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="topbar">
+            <div><strong id="currentDate"></strong></div>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <span id="userName">User</span>
+                <button class="logout-btn" onclick="logout()"><i data-lucide="log-out"></i> Logout</button>
+            </div>
+        </header>
+        <div class="content-area" id="app-content">
+            <h2>Welcome to RetailPOS</h2>
+            <p>Select an option from the sidebar to begin.</p>
+        </div>
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        // 1. Authentication Check
+        const token = localStorage.getItem('pos_token');
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // 2. Load User Data & Apply RBAC
+        const user = JSON.parse(localStorage.getItem('pos_user') || '{}');
+        document.getElementById('userName').textContent = user.name || 'User';
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        const userPermissions = user.permissions || [];
+        
+        // Hide sidebar items user doesn't have permission for
+        document.querySelectorAll('.nav-item[data-perm]').forEach(item => {
+            const requiredPerm = item.getAttribute('data-perm');
+            if (!userPermissions.includes(requiredPerm)) {
+                item.classList.add('hidden');
+            }
+        });
+
+        // 3. Logout function
+        function logout() {
+            localStorage.removeItem('pos_token');
+            localStorage.removeItem('pos_user');
+            window.location.href = '/login.html';
+        }
+    </script>
+    <script>
+        // Sidebar Navigation Logic
+        const views = {
+            'nav-dashboard': () => document.getElementById('app-content').innerHTML = '<h2>Dashboard</h2><p>Overview metrics will appear here.</p>',
+            'nav-products': loadProductModule,
+            'nav-sales-new': loadNewOrderModule,
+            'nav-admin': loadAdminModule
+        };
+
+        // Attach click listeners to all sidebar items
+        Object.keys(views).forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener('click', (e) => {
+                    // Remove active styling from all items
+                    document.querySelectorAll('.nav-item').forEach(nav => nav.style.background = 'transparent');
+                    // Add active styling to clicked item
+                    e.currentTarget.style.background = '#312e81';
+                    
+                    // Execute the matching function
+                    views[id]();
+                });
+            }
+        });
+
+        if (userPermissions.includes('sales.create')) {
+            loadNewOrderModule();
+            document.getElementById('nav-sales-new').style.background = '#312e81';
+        } else {
+            views['nav-dashboard']();
+        }
+    </script>
+
+    <script>
+        const views = {
+    'nav-dashboard': loadDashboardModule,
+    'nav-products': loadProductModule,
+    'nav-sales-new': loadNewOrderModule,
+    'nav-sales-list': loadSalesListModule,
+    'nav-customers': loadCustomersModule,
+    'nav-admin': loadAdminModule
+    };
+    </script>
+
+    <script>
+
+        // Navigation Router
+        document.getElementById('nav-products').addEventListener('click', () => {
+            // Requires products.js to be loaded via a <script> tag in index.html
+            loadProductModule(); 
+        });
+
+        document.getElementById('nav-sales-new').addEventListener('click', () => {
+            // Requires new-order.js to be loaded via a <script> tag in index.html
+            loadNewOrderModule();
+});
+</script>
+
+</body>
+</html>

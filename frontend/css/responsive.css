@@ -1,0 +1,37 @@
+/* Tablet & Mobile Breakpoints */
+@media (max-width: 1024px) {
+    .grid-2 {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Hide sidebar by default on mobile, make it a toggle (requires JS for full toggle) */
+    .sidebar {
+        position: fixed;
+        left: -250px;
+        height: 100vh;
+        z-index: 1000;
+        transition: 0.3s;
+    }
+    
+    .sidebar.active {
+        left: 0;
+    }
+
+    /* Adjust main content padding */
+    .content-area {
+        padding: 1rem;
+    }
+
+    /* Make tables scrollable horizontally */
+    table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    .topbar {
+        padding: 0 1rem;
+    }
+}
