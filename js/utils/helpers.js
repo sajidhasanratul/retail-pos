@@ -87,6 +87,7 @@
           .totals{margin-top:12px;text-align:right} .totals .grand{font-size:18px;font-weight:700}
           
           /* Thermal Receipt Printer CSS */
+          /* Thermal Receipt Printer CSS */
           .thermal-receipt {
             max-width: 80mm;
             margin: 0 auto;
@@ -96,30 +97,98 @@
           }
           .thermal-receipt table {
             border: none;
+            width: 100%;
+            border-collapse: collapse;
           }
-          .thermal-receipt th, .thermal-receipt td {
+          
+          /* Style 1: Standard Minimalist (Default) */
+          .thermal-receipt.style-1 th, .thermal-receipt.style-1 td {
             border: none;
             border-bottom: 1px dashed #ccc;
             padding: 5px 2px;
             font-size: 11px;
             background: none !important;
           }
-          .thermal-receipt th {
+          .thermal-receipt.style-1 th {
             border-bottom: 2px dashed #000;
             font-weight: 700;
             text-transform: uppercase;
           }
-          .thermal-receipt hr {
+          .thermal-receipt.style-1 hr {
             border: none;
             border-top: 1px dashed #000;
             margin: 10px 0;
           }
-          .thermal-receipt .totals {
+          .thermal-receipt.style-1 .totals {
             margin-top: 10px;
             border-top: 2px dashed #000;
             padding-top: 8px;
             text-align: right;
           }
+          
+          /* Style 2: Classic Bordered (Compact) */
+          .thermal-receipt.style-2 {
+            border: 2px solid #000;
+            padding: 8px;
+          }
+          .thermal-receipt.style-2 th, .thermal-receipt.style-2 td {
+            border: 1px solid #000;
+            padding: 5px;
+            font-size: 11px;
+            background: none !important;
+          }
+          .thermal-receipt.style-2 th {
+            font-weight: 700;
+            background: #f1f5f9 !important;
+          }
+          .thermal-receipt.style-2 hr {
+            border: none;
+            border-top: 1px solid #000;
+            margin: 8px 0;
+          }
+          .thermal-receipt.style-2 .totals {
+            margin-top: 8px;
+            border-top: 1px solid #000;
+            padding-top: 6px;
+            text-align: right;
+          }
+
+          /* Style 3: Modern Elegant (Centered Header) */
+          .thermal-receipt.style-3 {
+            text-align: center;
+          }
+          .thermal-receipt.style-3 table {
+            text-align: center;
+          }
+          .thermal-receipt.style-3 th, .thermal-receipt.style-3 td {
+            border: none;
+            border-bottom: 1px solid #ddd;
+            padding: 6px 3px;
+            font-size: 11px;
+            text-align: center;
+          }
+          .thermal-receipt.style-3 th:first-child, .thermal-receipt.style-3 td:first-child {
+            text-align: left;
+          }
+          .thermal-receipt.style-3 th:last-child, .thermal-receipt.style-3 td:last-child {
+            text-align: right;
+          }
+          .thermal-receipt.style-3 th {
+            border-bottom: 2px solid #000;
+            font-weight: 700;
+          }
+          .thermal-receipt.style-3 hr {
+            border: none;
+            border-top: 2px double #000;
+            margin: 10px 0;
+          }
+          .thermal-receipt.style-3 .totals {
+            margin-top: 10px;
+            border-top: 2px double #000;
+            padding-top: 8px;
+            text-align: right;
+          }
+          
           .thermal-receipt .totals p {
             margin: 3px 0;
           }
