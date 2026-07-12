@@ -174,8 +174,8 @@
       const today = H.today();
       const todaySales = await S.query('orders', o => H.isDateInRange(o.date, today, today));
 
-      const totalToday = todaySales.reduce((s, o) => s + o.grandTotal, 0);
-      const totalFiltered = list.reduce((s, o) => s + o.grandTotal, 0);
+      const totalToday = todaySales.reduce((s, o) => s + (parseFloat(o.grandTotal) || 0), 0);
+      const totalFiltered = list.reduce((s, o) => s + (parseFloat(o.grandTotal) || 0), 0);
 
       document.getElementById('stats-total-amount').textContent = H.formatCurrency(totalFiltered);
       document.getElementById('stats-today-amount').textContent = H.formatCurrency(totalToday);
@@ -192,11 +192,11 @@
       let groupSub = 0, groupDisc = 0, groupTax = 0, groupTotal = 0, groupPaid = 0;
 
       list.forEach(o => {
-        groupSub += o.subtotal;
-        groupDisc += o.discountAmount;
-        groupTax += o.taxAmount;
-        groupTotal += o.grandTotal;
-        groupPaid += o.paidAmount;
+        groupSub += parseFloat(o.subtotal) || 0;
+        groupDisc += parseFloat(o.discountAmount) || 0;
+        groupTax += parseFloat(o.taxAmount) || 0;
+        groupTotal += parseFloat(o.grandTotal) || 0;
+        groupPaid += parseFloat(o.paidAmount) || 0;
 
         tbody.innerHTML += `
           <tr class="sales-row" data-id="${o.id}">
@@ -370,8 +370,7 @@
       if (editBtn) {
         editBtn.onclick = () => {
           close();
-          localStorage.setItem('edit_order_id', order.id);
-          POS.Router.navigate('/new-order');
+          POS.Router.navigate('/edit-order/' + order.id);
         };
       }
 
