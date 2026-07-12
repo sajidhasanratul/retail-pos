@@ -202,6 +202,12 @@
       const S = POS.Store;
       const H = POS.Helpers;
 
+      // Auto-close search result dropdowns
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#search-customer')) document.getElementById('customer-results').classList.remove('open');
+        if (!e.target.closest('#search-product')) document.getElementById('product-results').classList.remove('open');
+      });
+      
       // Customer Search
       const searchCust = document.getElementById('search-customer');
       const custResults = document.getElementById('customer-results');
