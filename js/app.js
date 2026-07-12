@@ -10,6 +10,7 @@
       const R = POS.Router;
       R.register('/dashboard',       () => POS.Dashboard.render());
       R.register('/new-order',       () => POS.NewOrder.render());
+      R.register('/edit-order/:id',  (p) => POS.EditOrder.render(p.id));
       R.register('/sales-list',      () => POS.SalesList.render());
       R.register('/sales-return',    () => POS.SalesReturn.render());
       R.register('/return-list',     () => POS.ReturnList.render());
