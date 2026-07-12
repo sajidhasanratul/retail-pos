@@ -679,8 +679,17 @@
 
       const totalPaid = this.payments.reduce((s, p) => s + p.amount, 0);
 
-      // Preserve the EXACT original date and time of the order to avoid chronological shifting/moving down columns
-      const originalDate = this.activeOrder.date;
+      // Combine selected input date with original order's hours/minutes/seconds
+      const originalDateObj = new Date(this.activeOrder.date);
+      const dateParts = salesDate.split('-'); // [YYYY, MM, DD]
+      const finalDate = new Date(
+        parseInt(dateParts[0]),
+        parseInt(dateParts[1]) - 1,
+        parseInt(dateParts[2]),
+        originalDateObj.getHours(),
+        originalDateObj.getMinutes(),
+        originalDateObj.getSeconds()
+      );
       const orderId = this.editOrderId;
       const invoiceId = this.activeOrder.invoiceId;
 
@@ -690,7 +699,7 @@
         customerId: this.selectedCustomer ? this.selectedCustomer.id : 'walk-in',
         customerName: this.selectedCustomer ? this.selectedCustomer.name : 'Walk-in Customer',
         customerPhone: this.selectedCustomer ? this.selectedCustomer.phone : 'N/A',
-        date: originalDate, // Use the EXACT original datetime!
+        date: finalDate.toISOString(),
         subtotal,
         discountType: discType,
         discountValue: discVal,
@@ -752,7 +761,7 @@
       });
 
       const html = `
-        <div class="thermal-receipt">
+        <div class="thermal-receipt ${settings.invoice_style || 'style-1'}">
           <div style="text-align: center; margin-bottom: 8px;">
             <h3 style="margin:0; font-size:16px;">🏪 ${H.esc(settings.store_name || 'ZenPos')}</h3>
             <p style="font-size:10px; margin: 2px 0 0 0;">${H.esc(settings.store_address || '')}</p>
