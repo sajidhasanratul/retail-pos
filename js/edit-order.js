@@ -207,7 +207,7 @@
         if (!e.target.closest('#search-customer')) document.getElementById('customer-results').classList.remove('open');
         if (!e.target.closest('#search-product')) document.getElementById('product-results').classList.remove('open');
       });
-      
+
       // Customer Search
       const searchCust = document.getElementById('search-customer');
       const custResults = document.getElementById('customer-results');
@@ -216,6 +216,7 @@
         const query = e.target.value.toLowerCase().trim();
         if (query.length < 2) {
           custResults.innerHTML = '';
+          custResults.classList.remove('open');
           return;
         }
 
@@ -230,6 +231,7 @@
           if (quickBtn) {
             quickBtn.onclick = () => this.quickAddCustomer(query);
           }
+          custResults.classList.add('open');
           return;
         }
 
@@ -244,9 +246,11 @@
             this.selectCustomer(c);
             searchCust.value = '';
             custResults.innerHTML = '';
+            custResults.classList.remove('open');
           };
           custResults.appendChild(item);
         });
+        custResults.classList.add('open');
       }, 200);
 
       // Product Search / Scanner Simulator
@@ -257,6 +261,7 @@
         const query = e.target.value.toLowerCase().trim();
         if (query.length < 2) {
           prodResults.innerHTML = '';
+          prodResults.classList.remove('open');
           return;
         }
 
@@ -285,6 +290,7 @@
         prodResults.innerHTML = '';
         if (matches.length === 0) {
           prodResults.innerHTML = `<div class="p-2 text-muted text-sm text-center">No products matched.</div>`;
+          prodResults.classList.add('open');
           return;
         }
 
@@ -300,9 +306,11 @@
             this.addToCart(m);
             searchProd.value = '';
             prodResults.innerHTML = '';
+            prodResults.classList.remove('open');
           };
           prodResults.appendChild(item);
         });
+        prodResults.classList.add('open');
       }, 200);
 
       // Simulator Scan Button
