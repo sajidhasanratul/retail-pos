@@ -732,13 +732,25 @@
       const invoiceId = await S.getNextId('INV-');
       const orderId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 
+      // Construct a correct timezone-safe Date object keeping the current local hours/minutes/seconds
+      const nowObj = new Date();
+      const dateParts = salesDate.split('-'); // [YYYY, MM, DD]
+      const finalDate = new Date(
+        parseInt(dateParts[0]),
+        parseInt(dateParts[1]) - 1,
+        parseInt(dateParts[2]),
+        nowObj.getHours(),
+        nowObj.getMinutes(),
+        nowObj.getSeconds()
+      );
+
       const order = {
         id: orderId,
         invoiceId,
         customerId: this.selectedCustomer ? this.selectedCustomer.id : 'walk-in',
         customerName: this.selectedCustomer ? this.selectedCustomer.name : 'Walk-in Customer',
         customerPhone: this.selectedCustomer ? this.selectedCustomer.phone : 'N/A',
-        date: new Date(salesDate).toISOString(),
+        date: finalDate.toISOString(),
         subtotal,
         discountType: discType,
         discountValue: discVal,
@@ -800,7 +812,7 @@
       });
 
       const html = `
-        <div class="thermal-receipt">
+        <div class="thermal-receipt ${settings.invoice_style || 'style-1'}">
           <div style="text-align: center; margin-bottom: 8px;">
             <h3 style="margin:0; font-size:16px;">🏪 ${H.esc(settings.store_name || 'ZenPos')}</h3>
             <p style="font-size:10px; margin: 2px 0 0 0;">${H.esc(settings.store_address || '')}</p>
