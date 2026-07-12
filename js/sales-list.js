@@ -260,6 +260,7 @@
     async showDetailsModal(order) {
       const S = POS.Store;
       const H = POS.Helpers;
+      const user = S.getCurrentUser();
       const overlay = document.getElementById('sales-modal-overlay');
 
       const items = await S.query('orderItems', i => i.orderId === order.id);
@@ -469,3 +470,4 @@
   window.POS = window.POS || {};
   window.POS.SalesList = SalesList;
 })();
+
