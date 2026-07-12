@@ -204,14 +204,6 @@
             <div class="stat-sub">Physical cash</div>
           </div>
         </div>
-        <div class="stat-card red">
-          <div class="stat-icon">⚠️</div>
-          <div class="stat-info">
-            <div class="stat-label">Total Due</div>
-            <div class="stat-value">${H.formatCurrency(totalDue)}</div>
-            <div class="stat-sub">Collectable</div>
-          </div>
-        </div>
       `;
 
       // Render payment methods stats breakdown at bottom/popup or dashboard
