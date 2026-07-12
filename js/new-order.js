@@ -14,61 +14,15 @@
       this.cart = [];
       this.selectedCustomer = null;
       this.payments = [{ method: 'Cash', amount: 0 }];
-      this.editOrderId = localStorage.getItem('edit_order_id') || null;
-
-      let isEdit = !!this.editOrderId;
-      let titleText = isEdit ? '✏️ Edit Sales Invoice' : '🛒 New Sale';
-      let subtitleText = isEdit 
-        ? 'Modify the products, pricing, or payment splits for this invoice.' 
-        : 'Add customer details, scan or search products, and process payment.';
-      let submitBtnText = isEdit ? '💾 SAVE CHANGES' : '🎉 PLACE ORDER';
-      let activeOrder = null;
-
-      if (isEdit) {
-        activeOrder = await S.getById('orders', this.editOrderId);
-        if (activeOrder) {
-          const items = await S.query('orderItems', i => i.orderId === this.editOrderId);
-          const pmts = await S.query('payments', p => p.orderId === this.editOrderId);
-          const prods = await S.getAll('products');
-
-          this.cart = items.map(i => {
-            const p = prods.find(prod => prod.id === i.productId);
-            let stock = p ? p.stock : i.qty;
-            if (p && i.variationName && p.variations) {
-              const v = p.variations.find(varObj => varObj.name === i.variationName);
-              if (v) stock = v.stock;
-            }
-            return {
-              productId: i.productId,
-              productName: i.productName,
-              variationName: i.variationName,
-              unitPrice: i.unitPrice,
-              qty: i.qty,
-              image: p ? p.image : '',
-              stock: stock + i.qty
-            };
-          });
-
-          this.payments = pmts.map(p => ({
-            method: p.method,
-            amount: p.amount
-          }));
-
-          if (activeOrder.customerId && activeOrder.customerId !== 'walk-in') {
-            const cust = await S.getById('customers', activeOrder.customerId);
-            if (cust) this.selectedCustomer = cust;
-          }
-        }
-      }
 
       mc.innerHTML = `
         <div class="page-header fade-in">
           <div>
-            <h2 class="page-title">${titleText}</h2>
-            <p class="page-subtitle">${subtitleText}</p>
+            <h2 class="page-title">🛒 New Sale</h2>
+            <p class="page-subtitle">Add customer details, scan or search products, and process payment.</p>
           </div>
           <div class="page-actions">
-            <a href="#/sales-list" class="btn btn-secondary btn-sm" id="btn-cancel-edit">Back to Sales List</a>
+            <a href="#/sales-list" class="btn btn-secondary btn-sm">Back to Sales List</a>
           </div>
         </div>
 
@@ -86,7 +40,7 @@
                 </div>
                 <div class="form-group">
                   <label class="form-label">Sales Date</label>
-                  <input type="date" class="form-input" id="sales-date" value="${isEdit && activeOrder ? new Date(activeOrder.date).toISOString().slice(0, 10) : H.today()}">
+                  <input type="date" class="form-input" id="sales-date" value="${H.today()}">
                 </div>
               </div>
             </div>
@@ -132,18 +86,18 @@
                 <div class="form-group">
                   <label class="form-label">Discount Type</label>
                   <select class="form-select" id="discount-type">
-                    <option value="none" ${isEdit && activeOrder && activeOrder.discountType === 'none' ? 'selected' : ''}>None</option>
-                    <option value="percentage" ${isEdit && activeOrder && activeOrder.discountType === 'percentage' ? 'selected' : ''}>Percentage (%)</option>
-                    <option value="amount" ${isEdit && activeOrder && activeOrder.discountType === 'amount' ? 'selected' : ''}>Fixed Amount (৳)</option>
+                    <option value="none" selected>None</option>
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="amount">Fixed Amount (৳)</option>
                   </select>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Discount Value</label>
-                  <input type="number" class="form-input" id="discount-value" value="${isEdit && activeOrder ? activeOrder.discountValue : 0}" min="0" ${isEdit && activeOrder && activeOrder.discountType !== 'none' ? '' : 'disabled'}>
+                  <input type="number" class="form-input" id="discount-value" value="0" min="0" disabled>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Tax (%)</label>
-                  <input type="number" class="form-input" id="tax-percent" value="${isEdit && activeOrder ? activeOrder.taxPercent : 0}" min="0">
+                  <input type="number" class="form-input" id="tax-percent" value="0" min="0">
                 </div>
               </div>
             </div>
@@ -182,23 +136,14 @@
               </div>
 
               <button class="btn btn-success btn-lg btn-block mt-3" id="btn-place-order" style="padding:16px;">
-                ${submitBtnText}
+                🎉 PLACE ORDER
               </button>
             </div>
           </div>
         </div>
       `;
 
-      if (isEdit) {
-        document.getElementById('btn-cancel-edit').onclick = () => {
-          localStorage.removeItem('edit_order_id');
-        };
-      }
-
       this.initEvents();
-      if (this.selectedCustomer) {
-        this.selectCustomer(this.selectedCustomer);
-      }
       this.renderCart();
       this.renderPayments();
       this.recalculate();
@@ -766,7 +711,6 @@
         return;
       }
 
-      const isEdit = !!this.editOrderId;
       const salesDate = document.getElementById('sales-date').value;
       const subtotal = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
 
@@ -785,17 +729,8 @@
 
       const totalPaid = this.payments.reduce((s, p) => s + p.amount, 0);
 
-      let invoiceId = '';
-      let orderId = '';
-
-      if (isEdit) {
-        orderId = this.editOrderId;
-        const activeOrder = await S.getById('orders', this.editOrderId);
-        invoiceId = activeOrder ? activeOrder.invoiceId : 'INV-0000';
-      } else {
-        invoiceId = await S.getNextId('INV-');
-        orderId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-      }
+      const invoiceId = await S.getNextId('INV-');
+      const orderId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 
       const order = {
         id: orderId,
@@ -835,13 +770,10 @@
         amount: p.amount
       }));
 
-      const result = isEdit 
-        ? await S.updateOrder(this.editOrderId, order, orderItemsList, orderPaymentsList)
-        : await S.placeOrder(order, orderItemsList, orderPaymentsList);
+      const result = await S.placeOrder(order, orderItemsList, orderPaymentsList);
 
       if (result.success) {
-        H.showToast(isEdit ? `Order ${invoiceId} updated successfully!` : `Order ${invoiceId} placed successfully!`);
-        localStorage.removeItem('edit_order_id');
+        H.showToast(`Order ${invoiceId} placed successfully!`);
         if (await H.confirm('Would you like to print the receipt?')) {
           await this.printInvoice(order, this.cart);
         }
