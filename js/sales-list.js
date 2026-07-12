@@ -398,7 +398,7 @@
       });
 
       const html = `
-        <div class="thermal-receipt">
+        <div class="thermal-receipt ${settings.invoice_style || 'style-1'}">
           <div style="text-align: center; margin-bottom: 8px;">
             <h3 style="margin:0; font-size:16px;">🏪 ${H.esc(settings.store_name || 'ZenPos')}</h3>
             <p style="font-size:10px; margin: 2px 0 0 0;">${H.esc(settings.store_address || '')}</p>
