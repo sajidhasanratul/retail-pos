@@ -534,17 +534,9 @@
               <span style="font-weight:700;">Grand Total Sales Value:</span>
               <span style="font-weight:800; color:var(--primary); font-size:16px;">${H.formatCurrency(totalSales)}</span>
             </div>
-            <div class="flex justify-between text-success" style="border-bottom:1px solid var(--border-light); padding-bottom:8px;">
+            <div class="flex justify-between text-success" style="padding-bottom:4px;">
               <span>Total Received (Cleared):</span>
               <span style="font-weight:700;">${H.formatCurrency(totalPaid)}</span>
-            </div>
-            <div class="flex justify-between text-danger" style="border-bottom:1px solid var(--border-light); padding-bottom:8px;">
-              <span>Total Due Balances:</span>
-              <span style="font-weight:700;">${H.formatCurrency(totalDue)}</span>
-            </div>
-            <div class="flex justify-between text-warning" style="padding-bottom:4px;">
-              <span>Total Returned Refunds:</span>
-              <span style="font-weight:700;">${H.formatCurrency(totalReturned)}</span>
             </div>
           </div>
         </div>
