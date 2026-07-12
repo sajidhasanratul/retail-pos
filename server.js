@@ -35,14 +35,18 @@ const initDB = async () => {
   console.log('Connecting to MySQL and ensuring database exists...');
   
   // Connect without database selected first, to ensure database exists
-  const tempConn = await mysql.createConnection({
-    host: config.db.host,
-    user: config.db.user,
-    password: config.db.password,
-    port: config.db.port
-  });
-  await tempConn.query(`CREATE DATABASE IF NOT EXISTS \`${config.db.database}\``);
-  await tempConn.end();
+  try {
+    const tempConn = await mysql.createConnection({
+      host: config.db.host,
+      user: config.db.user,
+      password: config.db.password,
+      port: config.db.port
+    });
+    await tempConn.query(`CREATE DATABASE IF NOT EXISTS \`${config.db.database}\``);
+    await tempConn.end();
+  } catch (err) {
+    console.warn(`Warning: Could not auto-create database (${err.message}). Proceeding assuming it exists.`);
+  }
 
   console.log(`Database "${config.db.database}" ready. Creating tables...`);
 
