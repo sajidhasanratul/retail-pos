@@ -646,7 +646,46 @@
         };
 
         row.querySelector('.payment-amount-input').oninput = (e) => {
-          this.payments[idx].amount = parseFloat(e.target.value) || 0;
+          const val = parseFloat(e.target.value) || 0;
+          this.payments[idx].amount = val;
+
+          // Auto-balance remaining payment amount across other split row
+          if (this.payments.length > 1) {
+            const subtotal = this.cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0);
+            const discType = document.getElementById('discount-type').value;
+            const discVal = parseFloat(document.getElementById('discount-value').value) || 0;
+            let discountAmount = 0;
+            if (discType === 'percentage') {
+              discountAmount = subtotal * (discVal / 100);
+            } else if (discType === 'amount') {
+              discountAmount = discVal;
+            }
+            if (discountAmount > subtotal) discountAmount = subtotal;
+            const taxPercent = parseFloat(document.getElementById('tax-percent').value) || 0;
+            const taxAmount = (subtotal - discountAmount) * (taxPercent / 100);
+            const grandTotal = subtotal - discountAmount + taxAmount;
+
+            let balancingIdx = this.payments.length - 1;
+            if (idx === balancingIdx) {
+              balancingIdx = 0;
+            }
+
+            let sumOthers = 0;
+            this.payments.forEach((p, pIdx) => {
+              if (pIdx !== balancingIdx) {
+                sumOthers += p.amount;
+              }
+            });
+
+            let balancedAmount = grandTotal - sumOthers;
+            if (balancedAmount < 0) balancedAmount = 0;
+            this.payments[balancingIdx].amount = balancedAmount;
+
+            const balancedInput = container.querySelector(`.payment-row[data-index="${balancingIdx}"] .payment-amount-input`);
+            if (balancedInput) {
+              balancedInput.value = balancedAmount.toFixed(2);
+            }
+          }
           this.recalculate();
         };
 
