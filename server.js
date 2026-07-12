@@ -192,6 +192,19 @@ const initDB = async () => {
       ('u-cash', 'cashier', 'cashier', 'Senior Cashier', 'cashier')`);
   }
 
+  await dbQuery(`CREATE TABLE IF NOT EXISTS settings (
+    key_name VARCHAR(100) PRIMARY KEY,
+    val TEXT
+  )`);
+
+  const settingsCount = await dbQuery(`SELECT COUNT(*) as count FROM settings`);
+  if (settingsCount[0].count === 0) {
+    await dbQuery(`INSERT INTO settings (key_name, val) VALUES 
+      ('store_name', 'ZenPos Store'),
+      ('store_address', '123 Market Street, Dhaka'),
+      ('store_phone', '01700000000')`);
+  }
+
   // Seeding Catalog if empty
   const prods = await dbQuery(`SELECT count(*) as count FROM products`);
   if (prods[0].count === 0) {
@@ -297,6 +310,32 @@ app.put('/api/auth/change-password', async (req, res) => {
   }
 });
 
+// ── Settings Endpoints ───────────────────────────
+app.get('/api/settings', async (req, res) => {
+  try {
+    const rows = await dbQuery(`SELECT * FROM settings`);
+    const settings = {};
+    rows.forEach(r => {
+      settings[r.key_name] = r.val;
+    });
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/settings', verifyRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const { store_name, store_address, store_phone } = req.body;
+    if (store_name !== undefined) await dbQuery(`UPDATE settings SET val = ? WHERE key_name = 'store_name'`, [store_name]);
+    if (store_address !== undefined) await dbQuery(`UPDATE settings SET val = ? WHERE key_name = 'store_address'`, [store_address]);
+    if (store_phone !== undefined) await dbQuery(`UPDATE settings SET val = ? WHERE key_name = 'store_phone'`, [store_phone]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Users Management (Admin Only)
 app.get('/api/users', verifyRole(['admin']), async (req, res) => {
   try {
@@ -377,6 +416,16 @@ app.post('/api/categories', verifyRole(['admin', 'manager']), async (req, res) =
   try {
     const { id, name } = req.body;
     await dbQuery(`INSERT INTO categories (id, name) VALUES (?, ?)`, [id, name]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/categories/:id', verifyRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const cid = req.params.id;
+    await dbQuery(`DELETE FROM categories WHERE id = ?`, [cid]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -560,6 +609,67 @@ app.post('/api/orders', async (req, res) => {
     }
 
     await connection.execute(`UPDATE counters SET val = val + 1 WHERE key_name = 'invoice'`);
+
+    await connection.commit();
+    res.json({ success: true });
+  } catch (err) {
+    await connection.rollback();
+    res.status(500).json({ error: err.message });
+  } finally {
+    connection.release();
+  }
+});
+
+app.put('/api/orders/:id', verifyRole(['admin', 'manager']), async (req, res) => {
+  const oid = req.params.id;
+  const connection = await getPool().getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const { order, items, payments } = req.body;
+
+    // 1. Revert old stock changes
+    const [oldItems] = await connection.execute(`SELECT * FROM orderItems WHERE orderId = ?`, [oid]);
+    for (const item of oldItems) {
+      if (item.variationName) {
+        await connection.execute(`UPDATE variations SET stock = stock + ? WHERE productId = ? AND name = ?`,
+          [item.qty, item.productId, item.variationName]);
+      }
+      await connection.execute(`UPDATE products SET stock = stock + ? WHERE id = ?`, [item.qty, item.productId]);
+    }
+
+    // 2. Delete old records
+    await connection.execute(`DELETE FROM orders WHERE id = ?`, [oid]);
+    await connection.execute(`DELETE FROM orderItems WHERE orderId = ?`, [oid]);
+    await connection.execute(`DELETE FROM payments WHERE orderId = ?`, [oid]);
+
+    // 3. Insert new records
+    const formattedDate = new Date(order.date).toISOString().slice(0, 19).replace('T', ' ');
+
+    await connection.execute(`INSERT INTO orders (
+      id, invoiceId, customerId, customerName, customerPhone, date, subtotal, discountType, 
+      discountValue, discountAmount, taxPercent, taxAmount, grandTotal, paidAmount, dueAmount, returnedAmount, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [oid, order.invoiceId, order.customerId, order.customerName, order.customerPhone, formattedDate, order.subtotal,
+      order.discountType, order.discountValue, order.discountAmount, order.taxPercent, order.taxAmount, order.grandTotal,
+      order.paidAmount, order.dueAmount, order.returnedAmount, order.status]);
+
+    for (const item of items) {
+      await connection.execute(`INSERT INTO orderItems (id, orderId, productId, productName, variationName, qty, unitPrice, total) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [item.id, oid, item.productId, item.productName, item.variationName, item.qty, item.unitPrice, item.total]);
+
+      if (item.variationName) {
+        await connection.execute(`UPDATE variations SET stock = stock - ? WHERE productId = ? AND name = ?`,
+          [item.qty, item.productId, item.variationName]);
+      }
+      await connection.execute(`UPDATE products SET stock = stock - ? WHERE id = ?`, [item.qty, item.productId]);
+    }
+
+    for (const p of payments) {
+      await connection.execute(`INSERT INTO payments (id, orderId, method, amount) VALUES (?, ?, ?, ?)`,
+        [p.id, oid, p.method, p.amount]);
+    }
 
     await connection.commit();
     res.json({ success: true });
