@@ -349,18 +349,6 @@
                   <span>Paid Amount:</span>
                   <span style="font-weight:700;">${H.formatCurrency(order.paidAmount)}</span>
                 </div>
-                ${order.dueAmount > 0 ? `
-                  <div class="flex justify-between text-danger">
-                    <span>Due Amount:</span>
-                    <span style="font-weight:700;">${H.formatCurrency(order.dueAmount)}</span>
-                  </div>
-                ` : ''}
-                ${order.returnedAmount > 0 ? `
-                  <div class="flex justify-between text-warning">
-                    <span>Returned Amount:</span>
-                    <span style="font-weight:700;">${H.formatCurrency(order.returnedAmount)}</span>
-                  </div>
-                ` : ''}
               </div>
             </div>
           </div>
@@ -444,8 +432,6 @@
             ${order.taxAmount > 0 ? `<p>Tax (${order.taxPercent}%): <strong>${H.formatCurrency(order.taxAmount)}</strong></p>` : ''}
             <p style="font-size:13px; font-weight:800; border-top:1px dashed #000; padding-top:4px; margin-top:4px;">Grand Total: <span>${H.formatCurrency(order.grandTotal)}</span></p>
             <p>Paid Amount: <strong>${H.formatCurrency(order.paidAmount)}</strong></p>
-            ${order.dueAmount > 0 ? `<p>Due Amount: <strong>${H.formatCurrency(order.dueAmount)}</strong></p>` : ''}
-            ${order.returnedAmount > 0 ? `<p>Returned: <strong>${H.formatCurrency(order.returnedAmount)}</strong></p>` : ''}
           </div>
           
           <div style="text-align: center; margin-top: 25px; font-size: 10px;">
