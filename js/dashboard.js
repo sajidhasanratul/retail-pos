@@ -126,19 +126,20 @@
       });
 
       orders.forEach(order => {
-        totalSales += order.grandTotal;
-        totalDue += order.dueAmount;
+        totalSales += parseFloat(order.grandTotal) || 0;
+        totalDue += parseFloat(order.dueAmount) || 0;
 
         // Sum payment methods for this order
         const ordPayments = payments.filter(p => p.orderId === order.id);
         ordPayments.forEach(p => {
+          const amt = parseFloat(p.amount) || 0;
           if (paymentBreakdown[p.method] !== undefined) {
-            paymentBreakdown[p.method] += p.amount;
+            paymentBreakdown[p.method] += amt;
           } else {
-            paymentBreakdown[p.method] = p.amount;
+            paymentBreakdown[p.method] = amt;
           }
-          if (p.method === 'Cash') cashSales += p.amount;
-          if (p.method === 'Card') cardSales += p.amount;
+          if (p.method === 'Cash') cashSales += amt;
+          if (p.method === 'Card') cardSales += amt;
         });
       });
 
