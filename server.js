@@ -202,7 +202,11 @@ const initDB = async () => {
     await dbQuery(`INSERT INTO settings (key_name, val) VALUES 
       ('store_name', 'ZenPos Store'),
       ('store_address', '123 Market Street, Dhaka'),
-      ('store_phone', '01700000000')`);
+      ('store_phone', '01700000000'),
+      ('invoice_style', 'style-1')`);
+  } else {
+    // Make sure invoice_style entry is present if table already existed
+    await dbQuery(`INSERT IGNORE INTO settings (key_name, val) VALUES ('invoice_style', 'style-1')`);
   }
 
   // Seeding Catalog if empty
@@ -326,10 +330,13 @@ app.get('/api/settings', async (req, res) => {
 
 app.put('/api/settings', verifyRole(['admin', 'manager']), async (req, res) => {
   try {
-    const { store_name, store_address, store_phone } = req.body;
+    const { store_name, store_address, store_phone, invoice_style } = req.body;
     if (store_name !== undefined) await dbQuery(`UPDATE settings SET val = ? WHERE key_name = 'store_name'`, [store_name]);
     if (store_address !== undefined) await dbQuery(`UPDATE settings SET val = ? WHERE key_name = 'store_address'`, [store_address]);
     if (store_phone !== undefined) await dbQuery(`UPDATE settings SET val = ? WHERE key_name = 'store_phone'`, [store_phone]);
+    if (invoice_style !== undefined) {
+      await dbQuery(`INSERT INTO settings (key_name, val) VALUES ('invoice_style', ?) ON DUPLICATE KEY UPDATE val = ?`, [invoice_style, invoice_style]);
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -548,7 +555,7 @@ app.delete('/api/customers/:id', verifyRole(['admin', 'manager']), async (req, r
 // Orders
 app.get('/api/orders', async (req, res) => {
   try {
-    const rows = await dbQuery(`SELECT * FROM orders ORDER BY date DESC`);
+    const rows = await dbQuery(`SELECT id, invoiceId, customerId, customerName, customerPhone, DATE_FORMAT(date, '%Y-%m-%dT%H:%i:%s.000Z') as date, subtotal, discountType, discountValue, discountAmount, taxPercent, taxAmount, grandTotal, paidAmount, dueAmount, returnedAmount, status FROM orders ORDER BY date DESC`);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -684,7 +691,7 @@ app.put('/api/orders/:id', verifyRole(['admin', 'manager']), async (req, res) =>
 // Returns
 app.get('/api/returns', async (req, res) => {
   try {
-    const rows = await dbQuery(`SELECT * FROM returns ORDER BY date DESC`);
+    const rows = await dbQuery(`SELECT id, returnId, orderId, invoiceId, customerName, customerPhone, DATE_FORMAT(date, '%Y-%m-%dT%H:%i:%s.000Z') as date, returnTotal, status FROM returns ORDER BY date DESC`);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
