@@ -901,7 +901,6 @@
             ${order.taxAmount > 0 ? `<p>Tax (${order.taxPercent}%): <strong>${H.formatCurrency(order.taxAmount)}</strong></p>` : ''}
             <p style="font-size:13px; font-weight:800; border-top:1px dashed #000; padding-top:4px; margin-top:4px;">Grand Total: <span>${H.formatCurrency(order.grandTotal)}</span></p>
             <p>Paid Amount: <strong>${H.formatCurrency(order.paidAmount)}</strong></p>
-            ${order.dueAmount > 0 ? `<p>Due Amount: <strong>${H.formatCurrency(order.dueAmount)}</strong></p>` : ''}
           </div>
           
           <div style="text-align: center; margin-top: 25px; font-size: 10px;">
