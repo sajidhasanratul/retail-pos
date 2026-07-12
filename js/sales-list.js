@@ -88,8 +88,6 @@
                     <th class="text-right">Tax</th>
                     <th class="text-right">Grand Total</th>
                     <th class="text-right">Paid</th>
-                    <th class="text-right">Due</th>
-                    <th class="text-right">Returned</th>
                     <th class="text-center">Actions</th>
                   </tr>
                 </thead>
@@ -186,12 +184,12 @@
       tbody.innerHTML = '';
 
       if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted">No sales orders found matching criteria.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted">No sales orders found matching criteria.</td></tr>`;
         return;
       }
 
       // Track group totals
-      let groupSub = 0, groupDisc = 0, groupTax = 0, groupTotal = 0, groupPaid = 0, groupDue = 0, groupReturned = 0;
+      let groupSub = 0, groupDisc = 0, groupTax = 0, groupTotal = 0, groupPaid = 0;
 
       list.forEach(o => {
         groupSub += o.subtotal;
@@ -199,8 +197,6 @@
         groupTax += o.taxAmount;
         groupTotal += o.grandTotal;
         groupPaid += o.paidAmount;
-        groupDue += o.dueAmount;
-        groupReturned += o.returnedAmount;
 
         tbody.innerHTML += `
           <tr class="sales-row" data-id="${o.id}">
@@ -215,8 +211,6 @@
             <td class="text-right">${H.formatCurrency(o.taxAmount)}</td>
             <td class="text-right" style="font-weight:700; color:var(--primary);">${H.formatCurrency(o.grandTotal)}</td>
             <td class="text-right text-success" style="font-weight:600;">${H.formatCurrency(o.paidAmount)}</td>
-            <td class="text-right text-danger" style="font-weight:600;">${H.formatCurrency(o.dueAmount)}</td>
-            <td class="text-right text-warning" style="font-weight:600;">${H.formatCurrency(o.returnedAmount)}</td>
             <td class="text-center">
               <div style="display:flex; justify-content:center; gap:6px;">
                 <button class="btn btn-secondary btn-sm btn-view-invoice" title="View Details">👁️</button>
@@ -237,8 +231,6 @@
           <td class="text-right">${H.formatCurrency(groupTax)}</td>
           <td class="text-right" style="color:var(--primary);">${H.formatCurrency(groupTotal)}</td>
           <td class="text-right text-success">${H.formatCurrency(groupPaid)}</td>
-          <td class="text-right text-danger">${H.formatCurrency(groupDue)}</td>
-          <td class="text-right text-warning">${H.formatCurrency(groupReturned)}</td>
           <td></td>
         </tr>
       `;
@@ -470,4 +462,3 @@
   window.POS = window.POS || {};
   window.POS.SalesList = SalesList;
 })();
-
