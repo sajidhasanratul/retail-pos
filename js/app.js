@@ -336,6 +336,14 @@
                 <label class="form-label">Contact / Phone Number</label>
                 <input type="text" class="form-input" id="set-store-phone" value="Fetching...">
               </div>
+              <div class="form-group">
+                <label class="form-label">Invoice Template Style</label>
+                <select class="form-select" id="set-invoice-style">
+                  <option value="style-1">Standard Minimalist (Default)</option>
+                  <option value="style-2">Classic Bordered (Compact)</option>
+                  <option value="style-3">Modern Elegant (Centered Header)</option>
+                </select>
+              </div>
               <button class="btn btn-primary" id="btn-save-settings" style="padding:14px; font-weight:700;" disabled>
                 💾 Save Settings
               </button>
@@ -347,6 +355,7 @@
         document.getElementById('set-store-name').value = settings.store_name || '';
         document.getElementById('set-store-address').value = settings.store_address || '';
         document.getElementById('set-store-phone').value = settings.store_phone || '';
+        document.getElementById('set-invoice-style').value = settings.invoice_style || 'style-1';
         
         const saveBtn = document.getElementById('btn-save-settings');
         saveBtn.disabled = false;
@@ -355,6 +364,7 @@
           const store_name = document.getElementById('set-store-name').value.trim();
           const store_address = document.getElementById('set-store-address').value.trim();
           const store_phone = document.getElementById('set-store-phone').value.trim();
+          const invoice_style = document.getElementById('set-invoice-style').value;
 
           if (!store_name || !store_address || !store_phone) {
             H.showToast('Please fill out all settings fields.', 'error');
@@ -364,7 +374,7 @@
           saveBtn.disabled = true;
           saveBtn.innerText = 'Saving...';
 
-          const res = await S.updateSettings({ store_name, store_address, store_phone });
+          const res = await S.updateSettings({ store_name, store_address, store_phone, invoice_style });
           saveBtn.disabled = false;
           saveBtn.innerHTML = '💾 Save Settings';
 
