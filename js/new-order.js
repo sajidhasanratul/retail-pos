@@ -230,15 +230,15 @@
 
         products.forEach(p => {
           // Check standard product sku / barcode / name
-          const pNameMatch = p.name.toLowerCase().includes(query);
-          const pSkuMatch = p.sku.toLowerCase().includes(query);
-          const pBarcodeMatch = p.barcode.includes(query);
+          const pNameMatch = p.name ? p.name.toLowerCase().includes(query) : false;
+          const pSkuMatch = p.sku ? p.sku.toLowerCase().includes(query) : false;
+          const pBarcodeMatch = p.barcode ? p.barcode.includes(query) : false;
 
           if (p.variations && p.variations.length > 0) {
             p.variations.forEach(v => {
-              const vNameMatch = v.name.toLowerCase().includes(query);
-              const vSkuMatch = v.sku.toLowerCase().includes(query);
-              const vBarcodeMatch = v.barcode.includes(query);
+              const vNameMatch = v.name ? v.name.toLowerCase().includes(query) : false;
+              const vSkuMatch = v.sku ? v.sku.toLowerCase().includes(query) : false;
+              const vBarcodeMatch = v.barcode ? v.barcode.includes(query) : false;
               if (pNameMatch || pSkuMatch || pBarcodeMatch || vNameMatch || vSkuMatch || vBarcodeMatch) {
                 matches.push({
                   id: p.id,
@@ -526,7 +526,12 @@
                 </div>
               </div>
             </td>
-            <td>${H.formatCurrency(item.unitPrice)}</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:4px; max-width:110px;">
+                <span>৳</span>
+                <input type="number" class="input-price form-input" value="${item.unitPrice}" min="0.01" step="0.01" style="padding:4px 6px; height:28px; width:100%; font-size:12px; font-weight:600;">
+              </div>
+            </td>
             <td>
               <div class="qty-control">
                 <button class="btn-qty-dec">-</button>
@@ -573,6 +578,16 @@
             H.showToast('Adjusted to max available stock', 'warning');
           }
           item.qty = val;
+          this.renderCart();
+          this.recalculate();
+        };
+
+        row.querySelector('.input-price').onchange = (e) => {
+          let val = parseFloat(e.target.value) || 0;
+          if (val < 0) val = 0;
+          item.unitPrice = val;
+          // Re-render and recalculate without clearing input focus if possible,
+          // but calling renderCart() is simple and correct
           this.renderCart();
           this.recalculate();
         };
