@@ -275,13 +275,293 @@
             font-weight: 600;
           }
           
+          /* Paper Invoice CSS styles */
+          .paper-invoice {
+            max-width: 800px;
+            margin: 0 auto;
+            color: #1e293b;
+            padding: 10px;
+          }
+          .paper-invoice .invoice-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+          }
+          .paper-invoice .store-details h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #0f172a;
+          }
+          .paper-invoice .invoice-meta {
+            text-align: right;
+          }
+          .paper-invoice .invoice-meta h1 {
+            font-size: 26px;
+            font-weight: 800;
+            color: #1e293b;
+            letter-spacing: -0.5px;
+          }
+          .paper-invoice .billing-details {
+            margin-bottom: 20px;
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+          }
+          .paper-invoice .billing-details h3 {
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #475569;
+            text-transform: uppercase;
+          }
+          .paper-invoice .items-table th, .paper-invoice .items-table td {
+            padding: 10px 12px;
+            font-size: 12px;
+          }
+          .paper-invoice .invoice-bottom {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            gap: 40px;
+          }
+          .paper-invoice .notes-area {
+            flex: 1;
+            font-size: 11px;
+            color: #64748b;
+            line-height: 1.5;
+          }
+          .paper-invoice .totals-area {
+            width: 300px;
+          }
+          .paper-invoice .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .paper-invoice .totals-row.grand {
+            font-size: 16px;
+            font-weight: 800;
+            color: #0f172a;
+            border-bottom: 2px solid #0f172a;
+            padding: 8px 0;
+          }
+          .paper-invoice .totals-row.paid {
+            font-size: 13px;
+            color: #10b981;
+            border: none;
+          }
+          .paper-invoice .signature-line {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            font-size: 12px;
+          }
+          .paper-invoice .sig-box {
+            text-align: center;
+          }
+          
+          /* Modern Minimalist Theme */
+          .paper-invoice.theme-modern .invoice-top {
+            border-bottom: 3px solid #3b82f6;
+          }
+          .paper-invoice.theme-modern .items-table th {
+            background: #3b82f6;
+            color: #fff;
+          }
+          
+          /* Classic Business Theme */
+          .paper-invoice.theme-classic .invoice-top {
+            border-bottom: 4px double #000;
+          }
+          .paper-invoice.theme-classic .items-table th {
+            background: #000;
+            color: #fff;
+          }
+          .paper-invoice.theme-classic .billing-details {
+            background: #fff;
+            border-radius: 0;
+            border: 2px solid #000;
+          }
+
+          /* Compact Invoice Theme */
+          .paper-invoice.theme-compact {
+            font-size: 11px;
+          }
+          .paper-invoice.theme-compact .invoice-top {
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+          }
+          .paper-invoice.theme-compact .items-table th, .paper-invoice.theme-compact .items-table td {
+            padding: 6px 8px;
+          }
+          
           @media print {
             body { padding: 0 !important; }
             .product-label { border: none !important; }
+            .paper-invoice { width: 100% !important; padding: 0 !important; margin: 0 !important; }
           }
         </style></head><body>${html}</body></html>`);
       w.document.close();
       setTimeout(() => { w.print(); }, 400);
+    },
+
+    async printOrder(order, items) {
+      const S = POS.Store;
+      const settings = await S.getSettings();
+      const printType = settings.default_print_type || 'receipt';
+
+      let itemsHtml = '';
+      items.forEach(item => {
+        itemsHtml += `
+          <tr>
+            <td>${this.esc(item.productName)} ${item.variationName ? `<br><small style="color:#555">${this.esc(item.variationName)}</small>` : ''}</td>
+            <td class="text-center">${item.qty}</td>
+            <td class="text-right">${this.formatCurrency(item.unitPrice)}</td>
+            <td class="text-right">${this.formatCurrency(item.total || (item.unitPrice * item.qty))}</td>
+          </tr>
+        `;
+      });
+
+      const storeName = settings.store_name || 'ZenPos Store';
+      const storeAddress = settings.store_address || '';
+      const storePhone = settings.store_phone || '';
+
+      let printContent = '';
+
+      if (printType === 'receipt') {
+        // Thermal Receipt layout
+        printContent = `
+          <div class="thermal-receipt ${settings.receipt_style || 'style-1'}">
+            <div style="text-align: center; margin-bottom: 8px;">
+              <h3 style="margin:0; font-size:16px;">🏪 ${this.esc(storeName)}</h3>
+              <p style="font-size:10px; margin: 2px 0 0 0;">${this.esc(storeAddress)}</p>
+              <p style="font-size:10px; margin: 1px 0 0 0;">Phone: ${this.esc(storePhone)}</p>
+            </div>
+            <hr>
+            <div style="font-size: 10px; line-height: 1.4; margin-bottom: 6px;">
+              <div><strong>Invoice ID:</strong> ${order.invoiceId}</div>
+              <div><strong>Customer:</strong> ${this.esc(order.customerName)} (${this.esc(order.customerPhone)})</div>
+              <div><strong>Date:</strong> ${this.formatDateTime(order.date)}</div>
+            </div>
+            <hr>
+            <table style="width:100%;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;">Item</th>
+                  <th style="text-align:center; width:40px;">Qty</th>
+                  <th style="text-align:right; width:60px;">Price</th>
+                  <th style="text-align:right; width:70px;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+            
+            <div class="totals" style="font-size: 11px;">
+              <p>Sub Total: <strong>${this.formatCurrency(order.subtotal)}</strong></p>
+              ${order.discountAmount > 0 ? `<p>Discount: <strong style="color:#000">-${this.formatCurrency(order.discountAmount)}</strong></p>` : ''}
+              ${order.taxAmount > 0 ? `<p>Tax (${order.taxPercent}%): <strong>${this.formatCurrency(order.taxAmount)}</strong></p>` : ''}
+              <p style="font-size:13px; font-weight:800; border-top:1px dashed #000; padding-top:4px; margin-top:4px;">Grand Total: <span>${this.formatCurrency(order.grandTotal)}</span></p>
+              <p>Paid Amount: <strong>${this.formatCurrency(order.paidAmount)}</strong></p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 25px; font-size: 10px;">
+              <p>Thank you for shopping with us!</p>
+              <p style="font-size: 9px; margin-top:4px; color:#555;">Software by Zen IT</p>
+            </div>
+          </div>
+        `;
+      } else {
+        // Paper A4 Invoice layout
+        printContent = `
+          <div class="paper-invoice ${settings.invoice_style || 'theme-modern'}">
+            <div class="invoice-top">
+              <div class="store-details">
+                <h2>🏬 ${this.esc(storeName)}</h2>
+                <p>${this.esc(storeAddress)}</p>
+                <p><strong>Phone:</strong> ${this.esc(storePhone)}</p>
+              </div>
+              <div class="invoice-meta">
+                <h1>RETAIL INVOICE</h1>
+                <p><strong>Invoice ID:</strong> ${order.invoiceId}</p>
+                <p><strong>Sales Date:</strong> ${this.formatDateTime(order.date)}</p>
+              </div>
+            </div>
+            
+            <div class="billing-details">
+              <h3>Bill To:</h3>
+              <p><strong>Customer Name:</strong> ${this.esc(order.customerName)}</p>
+              <p><strong>Contact Phone:</strong> ${this.esc(order.customerPhone)}</p>
+            </div>
+
+            <table class="items-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left;">Item Description</th>
+                  <th style="text-align:center; width:80px;">Qty</th>
+                  <th style="text-align:right; width:120px;">Unit Price</th>
+                  <th style="text-align:right; width:120px;">Total Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <div class="invoice-bottom">
+              <div class="notes-area">
+                <p style="font-weight:700; margin-bottom:4px; color:var(--text-dark);">Terms & Conditions</p>
+                <p>1. Goods once sold cannot be returned or exchanged.</p>
+                <p>2. Keep this invoice safe for any warranty claims.</p>
+                <p>3. Software owner Zen IT - zenit.com</p>
+              </div>
+              <div class="totals-area">
+                <div class="totals-row">
+                  <span>Sub Total:</span>
+                  <strong>${this.formatCurrency(order.subtotal)}</strong>
+                </div>
+                ${order.discountAmount > 0 ? `
+                  <div class="totals-row text-danger">
+                    <span>Discount:</span>
+                    <strong>-${this.formatCurrency(order.discountAmount)}</strong>
+                  </div>
+                ` : ''}
+                ${order.taxAmount > 0 ? `
+                  <div class="totals-row">
+                    <span>Tax (${order.taxPercent}%):</span>
+                    <strong>${this.formatCurrency(order.taxAmount)}</strong>
+                  </div>
+                ` : ''}
+                <div class="totals-row grand">
+                  <span>Grand Total:</span>
+                  <strong>${this.formatCurrency(order.grandTotal)}</strong>
+                </div>
+                <div class="totals-row paid">
+                  <span>Paid Amount:</span>
+                  <strong>${this.formatCurrency(order.paidAmount)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="signature-line">
+              <div class="sig-box">
+                <div style="border-top:1px solid #94a3b8; width:180px; margin-top:50px;">Customer Signature</div>
+              </div>
+              <div class="sig-box">
+                <div style="border-top:1px solid #94a3b8; width:180px; margin-top:50px;">Authorized Signature</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      this.printHTML(printContent, `Invoice ${order.invoiceId}`);
     },
 
     /* ── Toast Notification ────────────────────────── */
