@@ -207,10 +207,25 @@ const initDB = async () => {
   await dbQuery(`CREATE TABLE IF NOT EXISTS expenses (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    date DATETIME NOT NULL,
+    category VARCHAR(100),
     amount DECIMAL(10,2) NOT NULL,
+    date DATETIME NOT NULL,
+    status VARCHAR(50) DEFAULT 'Paid',
+    image LONGTEXT,
     note TEXT
   )`);
+
+  // Auto-migration check: If expenses lacks columns, add them.
+  try {
+    const columns = await dbQuery(`SHOW COLUMNS FROM expenses`);
+    const hasCategory = columns.some(c => c.Field === 'category');
+    if (!hasCategory) {
+      await dbQuery(`ALTER TABLE expenses ADD COLUMN category VARCHAR(100), ADD COLUMN status VARCHAR(50) DEFAULT 'Paid', ADD COLUMN image LONGTEXT`);
+      console.log('Database Migration: Added category, status and image columns to expenses table.');
+    }
+  } catch (migErr) {
+    console.warn('Warning during database column migration check:', migErr.message);
+  }
 
   // Seed default coupons if empty
   const couponsCount = await dbQuery(`SELECT COUNT(*) as count FROM coupons`);
@@ -353,12 +368,18 @@ app.get('/api/settings', async (req, res) => {
 
 app.put('/api/settings', verifyRole(['admin', 'manager']), async (req, res) => {
   try {
-    const { store_name, store_address, store_phone, invoice_style } = req.body;
+    const { store_name, store_address, store_phone, invoice_style, default_print_type, receipt_style } = req.body;
     if (store_name !== undefined) await dbQuery(`UPDATE settings SET val = ? WHERE key_name = 'store_name'`, [store_name]);
     if (store_address !== undefined) await dbQuery(`UPDATE settings SET val = ? WHERE key_name = 'store_address'`, [store_address]);
     if (store_phone !== undefined) await dbQuery(`UPDATE settings SET val = ? WHERE key_name = 'store_phone'`, [store_phone]);
     if (invoice_style !== undefined) {
       await dbQuery(`INSERT INTO settings (key_name, val) VALUES ('invoice_style', ?) ON DUPLICATE KEY UPDATE val = ?`, [invoice_style, invoice_style]);
+    }
+    if (default_print_type !== undefined) {
+      await dbQuery(`INSERT INTO settings (key_name, val) VALUES ('default_print_type', ?) ON DUPLICATE KEY UPDATE val = ?`, [default_print_type, default_print_type]);
+    }
+    if (receipt_style !== undefined) {
+      await dbQuery(`INSERT INTO settings (key_name, val) VALUES ('receipt_style', ?) ON DUPLICATE KEY UPDATE val = ?`, [receipt_style, receipt_style]);
     }
     res.json({ success: true });
   } catch (err) {
@@ -404,7 +425,7 @@ app.delete('/api/coupons/:code', verifyRole(['admin']), async (req, res) => {
 // Expenses
 app.get('/api/expenses', async (req, res) => {
   try {
-    const rows = await dbQuery(`SELECT id, name, DATE_FORMAT(date, '%Y-%m-%dT%H:%i:%s.000Z') as date, amount, note FROM expenses ORDER BY date DESC`);
+    const rows = await dbQuery(`SELECT id, name, category, amount, DATE_FORMAT(date, '%Y-%m-%dT%H:%i:%s.000Z') as date, status, image, note FROM expenses ORDER BY date DESC`);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -413,13 +434,13 @@ app.get('/api/expenses', async (req, res) => {
 
 app.post('/api/expenses', async (req, res) => {
   try {
-    const { id, name, date, amount, note } = req.body;
+    const { id, name, category, amount, date, status, image, note } = req.body;
     if (!name || !date || amount === undefined) {
       return res.status(400).json({ error: 'Missing expense fields' });
     }
     const formattedDate = new Date(date).toISOString().slice(0, 19).replace('T', ' ');
-    await dbQuery(`INSERT INTO expenses (id, name, date, amount, note) VALUES (?, ?, ?, ?, ?)`,
-      [id || 'exp_' + Math.random().toString(36).substr(2, 9), name, formattedDate, amount, note || '']);
+    await dbQuery(`INSERT INTO expenses (id, name, category, amount, date, status, image, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id || 'exp_' + Math.random().toString(36).substr(2, 9), name, category || 'Other', amount, formattedDate, status || 'Paid', image || '', note || '']);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -575,7 +596,9 @@ app.post('/api/products/bulk', verifyRole(['admin', 'manager']), async (req, res
       return res.status(400).json({ error: 'Body must be an array of products' });
     }
 
-    for (const item of products) {
+    // Step 1: Process all main products first
+    const mainItems = products.filter(item => !item.parentSku || item.parentSku === item.sku);
+    for (const item of mainItems) {
       const { name, sku, barcode, categoryName, costPrice, sellingPrice, stock, alertQty } = item;
       if (!name || !sku) continue;
 
@@ -591,26 +614,48 @@ app.post('/api/products/bulk', verifyRole(['admin', 'manager']), async (req, res
         }
       }
 
-      // Check if product or variation SKU exists
+      // Check if product with this SKU exists
       const prodRows = await dbQuery(`SELECT id FROM products WHERE sku = ?`, [sku]);
       if (prodRows.length > 0) {
         const pid = prodRows[0].id;
         await dbQuery(`UPDATE products SET name = ?, barcode = ?, categoryId = ?, costPrice = ?, sellingPrice = ?, stock = ?, alertQty = ? WHERE id = ?`,
           [name, barcode || null, categoryId, costPrice || 0, sellingPrice || 0, stock || 0, alertQty || 0, pid]);
       } else {
-        const varRows = await dbQuery(`SELECT id, productId FROM variations WHERE sku = ?`, [sku]);
-        if (varRows.length > 0) {
-          const vid = varRows[0].id;
-          await dbQuery(`UPDATE variations SET name = ?, barcode = ?, price = ?, costPrice = ?, stock = ? WHERE id = ?`,
-            [name, barcode || null, sellingPrice || 0, costPrice || 0, stock || 0, vid]);
-        } else {
-          const newPid = 'prod_' + Math.random().toString(36).substr(2, 9);
-          await dbQuery(`INSERT INTO products (id, name, sku, barcode, categoryId, costPrice, sellingPrice, stock, alertQty, image) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '')`,
-            [newPid, name, sku, barcode || null, categoryId, costPrice || 0, sellingPrice || 0, stock || 0, alertQty || 0]);
-        }
+        const newPid = 'prod_' + Math.random().toString(36).substr(2, 9);
+        await dbQuery(`INSERT INTO products (id, name, sku, barcode, categoryId, costPrice, sellingPrice, stock, alertQty, image) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '')`,
+          [newPid, name, sku, barcode || null, categoryId, costPrice || 0, sellingPrice || 0, stock || 0, alertQty || 0]);
       }
     }
+
+    // Step 2: Process variations
+    const varItems = products.filter(item => item.parentSku && item.parentSku !== item.sku);
+    for (const item of varItems) {
+      const { name, sku, barcode, parentSku, variationName, costPrice, sellingPrice, stock } = item;
+      if (!sku || !parentSku) continue;
+
+      // Find parent product ID
+      const parentRows = await dbQuery(`SELECT id FROM products WHERE sku = ?`, [parentSku]);
+      if (parentRows.length === 0) {
+        continue; // Skip variation if parent product is missing
+      }
+      const parentId = parentRows[0].id;
+
+      // Check if variation SKU exists
+      const varRows = await dbQuery(`SELECT id FROM variations WHERE sku = ?`, [sku]);
+      const vName = variationName || name || 'Default';
+      if (varRows.length > 0) {
+        const vid = varRows[0].id;
+        await dbQuery(`UPDATE variations SET name = ?, barcode = ?, price = ?, costPrice = ?, stock = ? WHERE id = ?`,
+          [vName, barcode || null, sellingPrice || 0, costPrice || 0, stock || 0, vid]);
+      } else {
+        const newVid = 'var_' + Math.random().toString(36).substr(2, 9);
+        await dbQuery(`INSERT INTO variations (id, productId, name, sku, barcode, price, costPrice, stock) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [newVid, parentId, vName, sku, barcode || null, sellingPrice || 0, costPrice || 0, stock || 0]);
+      }
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
