@@ -59,6 +59,15 @@
         </div>
 
         <div class="card mt-3 fade-in">
+          <div class="card-header">⏰ 24-Hour Sales Distribution (Hourly Peaks)</div>
+          <div class="card-body">
+            <div class="chart-container" style="height: 250px; position: relative;">
+              <canvas id="hourlySalesChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-3 fade-in">
           <div class="card-header">🏆 Top Selling Products</div>
           <div class="card-body">
             <div class="table-wrapper">
@@ -177,8 +186,11 @@
           <div class="stat-icon">💰</div>
           <div class="stat-info">
             <div class="stat-label">Total Sale</div>
-            <div class="stat-value">${H.formatCurrency(totalSales)}</div>
-            <div class="stat-sub">${orders.length} Invoice(s)</div>
+            <div class="stat-value" style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
+              <span>${H.formatCurrency(totalSales)}</span>
+              <span style="font-size: 13px; font-weight: 600; color: #ddd; background: rgba(255,255,255,0.2); padding: 1px 6px; border-radius: 4px;">${orders.length} Sales</span>
+            </div>
+            <div class="stat-sub">Invoiced Collections</div>
           </div>
         </div>
         <div class="stat-card green">
@@ -227,12 +239,16 @@
       statsGrid.insertAdjacentHTML('beforeend', pbHtml);
 
       // ── Charts & Top Selling ─────────────────────────
-      this.renderCharts(orders, paymentBreakdown);
+      this.renderCharts(orders, paymentBreakdown, from, to);
       this.renderTopSelling(orders, orderItems);
     },
 
-    renderCharts(orders, paymentBreakdown) {
+    renderCharts(orders, paymentBreakdown, from, to) {
       const H = POS.Helpers;
+
+      // Calculate diffDays inclusive
+      const diffTime = Math.abs(new Date(to) - new Date(from));
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
       // 1. Sales Trend (by day)
       const dailySales = {};
@@ -287,9 +303,62 @@
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false
+        }
+      });
+
+      // 3. 24-Hour Distribution (Hourly peaks)
+      const hourlyCounts = Array(24).fill(0);
+      orders.forEach(o => {
+        const hr = new Date(o.date).getHours();
+        if (hr >= 0 && hr < 24) {
+          hourlyCounts[hr]++;
+        }
+      });
+
+      const hourlyData = diffDays > 2 
+        ? hourlyCounts.map(c => parseFloat((c / diffDays).toFixed(2))) 
+        : hourlyCounts;
+
+      const hourLabels = Array.from({ length: 24 }, (_, i) => {
+        const h = i % 12 || 12;
+        const ampm = i < 12 ? 'AM' : 'PM';
+        return `${h} ${ampm}`;
+      });
+
+      const ctxHour = document.getElementById('hourlySalesChart').getContext('2d');
+      if (window.hourChart) window.hourChart.destroy();
+      window.hourChart = new Chart(ctxHour, {
+        type: 'bar',
+        data: {
+          labels: hourLabels,
+          datasets: [{
+            label: diffDays > 2 ? 'Average Sales (Qty)' : 'Total Sales (Qty)',
+            data: hourlyData,
+            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+            borderColor: '#3B82F6',
+            borderWidth: 1.5,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { position: 'right' }
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `Sales: ${context.raw} invoice(s)`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 }
+            }
           }
         }
       });
