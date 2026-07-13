@@ -276,11 +276,26 @@
                 <input type="text" class="form-input" id="set-store-phone" value="Fetching...">
               </div>
               <div class="form-group">
-                <label class="form-label">Invoice Template Style</label>
+                <label class="form-label">Default Print Format</label>
+                <select class="form-select" id="set-print-type">
+                  <option value="receipt">Thermal Receipt (80mm)</option>
+                  <option value="invoice">Paper Invoice (A4/A5)</option>
+                </select>
+              </div>
+              <div class="form-group" id="group-invoice-style">
+                <label class="form-label">Paper Invoice Theme</label>
                 <select class="form-select" id="set-invoice-style">
-                  <option value="style-1">Standard Minimalist (Default)</option>
-                  <option value="style-2">Classic Bordered (Compact)</option>
-                  <option value="style-3">Modern Elegant (Centered Header)</option>
+                  <option value="theme-modern">Modern Minimalist</option>
+                  <option value="theme-classic">Classic Business</option>
+                  <option value="theme-compact">Compact Invoice</option>
+                </select>
+              </div>
+              <div class="form-group" id="group-receipt-style">
+                <label class="form-label">Thermal Receipt Theme</label>
+                <select class="form-select" id="set-receipt-style">
+                  <option value="style-1">Style 1: Standard Minimalist</option>
+                  <option value="style-2">Style 2: Classic Bordered</option>
+                  <option value="style-3">Style 3: Modern Elegant (Centered)</option>
                 </select>
               </div>
               <button class="btn btn-primary" id="btn-save-settings" style="padding:14px; font-weight:700;" disabled>
@@ -294,7 +309,9 @@
         document.getElementById('set-store-name').value = settings.store_name || '';
         document.getElementById('set-store-address').value = settings.store_address || '';
         document.getElementById('set-store-phone').value = settings.store_phone || '';
-        document.getElementById('set-invoice-style').value = settings.invoice_style || 'style-1';
+        document.getElementById('set-print-type').value = settings.default_print_type || 'receipt';
+        document.getElementById('set-invoice-style').value = settings.invoice_style || 'theme-modern';
+        document.getElementById('set-receipt-style').value = settings.receipt_style || 'style-1';
         
         const saveBtn = document.getElementById('btn-save-settings');
         saveBtn.disabled = false;
@@ -303,7 +320,9 @@
           const store_name = document.getElementById('set-store-name').value.trim();
           const store_address = document.getElementById('set-store-address').value.trim();
           const store_phone = document.getElementById('set-store-phone').value.trim();
+          const default_print_type = document.getElementById('set-print-type').value;
           const invoice_style = document.getElementById('set-invoice-style').value;
+          const receipt_style = document.getElementById('set-receipt-style').value;
 
           if (!store_name || !store_address || !store_phone) {
             H.showToast('Please fill out all settings fields.', 'error');
@@ -313,7 +332,14 @@
           saveBtn.disabled = true;
           saveBtn.innerText = 'Saving...';
 
-          const res = await S.updateSettings({ store_name, store_address, store_phone, invoice_style });
+          const res = await S.updateSettings({ 
+            store_name, 
+            store_address, 
+            store_phone, 
+            invoice_style, 
+            default_print_type, 
+            receipt_style 
+          });
           saveBtn.disabled = false;
           saveBtn.innerHTML = '💾 Save Settings';
 
