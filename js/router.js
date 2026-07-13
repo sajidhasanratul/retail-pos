@@ -10,29 +10,49 @@
     },
 
     navigate(path) {
-      window.location.hash = '#' + path;
+      if (!path.startsWith('/')) {
+        path = '/' + path;
+      }
+      window.history.pushState(null, '', path);
+      this._resolve();
     },
 
     init() {
-      window.addEventListener('hashchange', () => this._resolve());
+      window.addEventListener('popstate', () => this._resolve());
+
+      // Intercept relative internal link clicks to perform SPA transitions
+      document.addEventListener('click', (e) => {
+        const anchor = e.target.closest('a');
+        if (anchor) {
+          const href = anchor.getAttribute('href');
+          // Intercept paths starting with '/' but not API paths
+          if (href && href.startsWith('/') && !href.startsWith('/api')) {
+            e.preventDefault();
+            this.navigate(href);
+          }
+        }
+      });
+
       const user = POS.Store.getCurrentUser();
       if (!user) {
-        window.location.href = 'login.html';
+        window.location.href = '/login.html';
         return;
       }
-      if (!window.location.hash || window.location.hash === '#') {
-        if (user.role === 'cashier') {
-          window.location.hash = '#/new-order';
-        } else {
-          window.location.hash = '#/dashboard';
-        }
+
+      let path = window.location.pathname;
+      if (path === '/' || path === '/index.html' || path === '') {
+        path = user.role === 'cashier' ? '/new-order' : '/dashboard';
+        window.history.replaceState(null, '', path);
       }
+
       this._resolve();
     },
 
     _resolve() {
-      const hash = window.location.hash.slice(1) || '/dashboard';
-      const path = hash.split('?')[0];
+      let path = window.location.pathname;
+      if (path === '/' || path === '/index.html' || path === '') {
+        path = '/dashboard';
+      }
 
       const S = POS.Store;
       const H = POS.Helpers;
@@ -40,7 +60,7 @@
 
       // Check session
       if (!currentUser) {
-        window.location.href = 'login.html';
+        window.location.href = '/login.html';
         return;
       }
 
@@ -56,7 +76,6 @@
           }
         } else if (role === 'manager') {
           const forbidden = ['/reports', '/users'];
-          // Also match subreports paths
           const isReport = path.startsWith('/reports');
           const isUser = path.startsWith('/users');
           if (isReport || isUser) {
@@ -66,12 +85,8 @@
 
         if (!allowed) {
           H.showToast('Access Denied for your Role privilege.', 'error');
-          if (role === 'cashier') {
-            window.location.hash = '#/new-order';
-          } else {
-            window.location.hash = '#/dashboard';
-          }
-          return;
+          path = role === 'cashier' ? '/new-order' : '/dashboard';
+          window.history.replaceState(null, '', path);
         }
       }
 
@@ -105,7 +120,7 @@
 
     _updateNav(path) {
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-      const link = document.querySelector('.nav-item[href="#' + path + '"]');
+      const link = document.querySelector('.nav-item[href="' + path + '"]');
       if (link) {
         link.classList.add('active');
         const groupItems = link.closest('.nav-group-items');
