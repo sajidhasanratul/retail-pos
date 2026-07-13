@@ -236,6 +236,29 @@ const initDB = async () => {
       ('SAVE50', 'amount', 50.00)`);
   }
 
+  // Create expense_categories table
+  await dbQuery(`CREATE TABLE IF NOT EXISTS expense_categories (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL
+  )`);
+
+  // Seed default expense categories if empty
+  const expCatsCount = await dbQuery(`SELECT COUNT(*) as count FROM expense_categories`);
+  if (expCatsCount[0].count === 0) {
+    const defaultExpCats = [
+      ['exp_cat_1', 'Utilities'],
+      ['exp_cat_2', 'Rent'],
+      ['exp_cat_3', 'Salaries'],
+      ['exp_cat_4', 'Inventory'],
+      ['exp_cat_5', 'Marketing'],
+      ['exp_cat_6', 'Maintenance'],
+      ['exp_cat_7', 'Other']
+    ];
+    for (const cat of defaultExpCats) {
+      await dbQuery(`INSERT INTO expense_categories (id, name) VALUES (?, ?)`, cat);
+    }
+  }
+
   const settingsCount = await dbQuery(`SELECT COUNT(*) as count FROM settings`);
   if (settingsCount[0].count === 0) {
     await dbQuery(`INSERT INTO settings (key_name, val) VALUES 
@@ -452,6 +475,41 @@ app.delete('/api/expenses/:id', verifyRole(['admin', 'manager']), async (req, re
   try {
     const eid = req.params.id;
     await dbQuery(`DELETE FROM expenses WHERE id = ?`, [eid]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Expense Categories
+app.get('/api/expense-categories', async (req, res) => {
+  try {
+    const rows = await dbQuery(`SELECT id, name FROM expense_categories ORDER BY name`);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/expense-categories', async (req, res) => {
+  try {
+    const { id, name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+    const cleanName = name.trim();
+    await dbQuery(`INSERT INTO expense_categories (id, name) VALUES (?, ?)`,
+      [id || 'exp_cat_' + Math.random().toString(36).substr(2, 9), cleanName]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/expense-categories/:id', verifyRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const id = req.params.id;
+    await dbQuery(`DELETE FROM expense_categories WHERE id = ?`, [id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
