@@ -17,12 +17,21 @@
       R.register('/reports/:type',   (p) => POS.Reports.render(p.type));
       R.register('/products',        () => POS.Products.render());
       R.register('/customers',       () => POS.Customers.render());
+      R.register('/expenses',        () => POS.Expenses.render());
+      R.register('/coupons',         () => {
+        const u = S.getCurrentUser();
+        if (u && u.role === 'admin') {
+          POS.Coupons.render();
+        } else {
+          POS.Helpers.showToast('Access denied: Admin only', 'error');
+          R.navigate('/dashboard');
+        }
+      });
       R.register('/users',           () => POS.Users.render());
 
       R.init();
       this._setupSidebar();
       this._updateHeaderDate();
-      this._setupBackup();
       this._setupSettings();
       this._updateUserHeader();
     },
@@ -86,18 +95,18 @@
 
         // Hide specific elements
         if (role === 'cashier') {
-          // Hide Dashboard, Catalog, Customers, Reports, Users
+          // Hide Dashboard, Catalog, Customers, Reports, Users, Coupons
           document.getElementById('nav-grp-dashboard').style.display = 'none';
           document.getElementById('nav-grp-catalog').style.display = 'none';
           document.getElementById('nav-grp-reports').style.display = 'none';
           document.getElementById('nav-grp-users').style.display = 'none';
-          document.getElementById('nav-grp-backup').style.display = 'none';
+          document.getElementById('nav-grp-coupons').style.display = 'none';
           document.getElementById('nav-grp-settings').style.display = 'none';
         } else if (role === 'manager') {
-          // Hide Reports, Users
+          // Hide Reports, Users, Coupons
           document.getElementById('nav-grp-reports').style.display = 'none';
           document.getElementById('nav-grp-users').style.display = 'none';
-          document.getElementById('nav-grp-backup').style.display = 'none';
+          document.getElementById('nav-grp-coupons').style.display = 'none';
           document.getElementById('nav-grp-settings').style.display = '';
         } else {
           // Admin sees everything
@@ -105,7 +114,7 @@
           document.getElementById('nav-grp-catalog').style.display = '';
           document.getElementById('nav-grp-reports').style.display = '';
           document.getElementById('nav-grp-users').style.display = '';
-          document.getElementById('nav-grp-backup').style.display = '';
+          document.getElementById('nav-grp-coupons').style.display = '';
           document.getElementById('nav-grp-settings').style.display = '';
         }
       }
@@ -235,77 +244,7 @@
       };
     },
 
-    /* ── Backup / Restore ──────────────────────────── */
-    _setupBackup() {
-      const btn = document.getElementById('nav-backup');
-      if (!btn) return;
-      btn.addEventListener('click', () => {
-        const mc = document.getElementById('main-content');
-        mc.innerHTML = `
-          <div class="page-header">
-            <div><h2 class="page-title">💾 Backup & Restore</h2>
-            <p class="page-subtitle">Export or import your POS data</p></div>
-          </div>
-          <div class="card" style="max-width:600px">
-            <div class="card-body" style="display:flex;flex-direction:column;gap:16px">
-              <button class="btn btn-primary" id="btn-export" style="padding:14px">
-                📥 Export Data (JSON)
-              </button>
-              <div class="divider-text"><span>or</span></div>
-              <label class="btn btn-secondary" style="padding:14px;text-align:center;cursor:pointer">
-                📤 Import Data (JSON)
-                <input type="file" accept=".json" id="file-import" style="display:none">
-              </label>
-              <button class="btn btn-danger" id="btn-reset" style="padding:14px">
-                🗑️ Reset All Data
-              </button>
-            </div>
-          </div>`;
 
-        document.getElementById('btn-export').onclick = async () => {
-          const data = await POS.Store.exportData();
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'pos_backup_' + POS.Helpers.today() + '.json';
-          a.click();
-          URL.revokeObjectURL(url);
-          POS.Helpers.showToast('Backup downloaded successfully');
-        };
-
-        document.getElementById('file-import').onchange = (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = async (ev) => {
-            try {
-              const data = JSON.parse(ev.target.result);
-              const ok = await POS.Store.importData(data);
-              if (ok) {
-                POS.Helpers.showToast('Data imported successfully! Refreshing…');
-                setTimeout(() => location.reload(), 1000);
-              } else {
-                POS.Helpers.showToast('Import failed on server', 'error');
-              }
-            } catch {
-              POS.Helpers.showToast('Invalid JSON file', 'error');
-            }
-          };
-          reader.readAsText(file);
-        };
-
-        document.getElementById('btn-reset').onclick = async () => {
-          if (await POS.Helpers.confirm('This will delete ALL data and reload with demo data. Continue?')) {
-            const ok = await POS.Store.importData({});
-            if (ok) {
-              POS.Helpers.showToast('Data reset complete. Refreshing…');
-              setTimeout(() => location.reload(), 1000);
-            }
-          }
-        };
-      });
-    },
 
     _setupSettings() {
       const btn = document.getElementById('nav-settings');
