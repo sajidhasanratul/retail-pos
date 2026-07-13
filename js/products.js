@@ -60,11 +60,28 @@
           const cat = categoriesList.find(c => c.id === p.categoryId);
           const catName = cat ? cat.name : 'Uncategorized';
 
+          // First, export the main product row
+          csvData.push({
+            'Product Name': p.name,
+            'SKU': p.sku,
+            'Parent SKU': '',
+            'Variation Name': '',
+            'Barcode': p.barcode || '',
+            'Category Name': catName,
+            'Cost Price': p.costPrice,
+            'Selling Price': p.sellingPrice,
+            'Alert Qty': p.alertQty,
+            'Stock': p.stock
+          });
+
+          // Second, export its variations if any
           if (p.variations && p.variations.length > 0) {
             p.variations.forEach(v => {
               csvData.push({
-                'Product Name': p.name + ` (${v.name})`,
+                'Product Name': p.name,
                 'SKU': v.sku,
+                'Parent SKU': p.sku,
+                'Variation Name': v.name,
                 'Barcode': v.barcode || '',
                 'Category Name': catName,
                 'Cost Price': v.costPrice,
@@ -72,17 +89,6 @@
                 'Alert Qty': p.alertQty,
                 'Stock': v.stock
               });
-            });
-          } else {
-            csvData.push({
-              'Product Name': p.name,
-              'SKU': p.sku,
-              'Barcode': p.barcode || '',
-              'Category Name': catName,
-              'Cost Price': p.costPrice,
-              'Selling Price': p.sellingPrice,
-              'Alert Qty': p.alertQty,
-              'Stock': p.stock
             });
           }
         });
@@ -108,6 +114,8 @@
               return {
                 name: r['Product Name'] || r['name'] || r['Product'] || '',
                 sku: r['SKU'] || r['sku'] || '',
+                parentSku: r['Parent SKU'] || r['parentSku'] || r['parent_sku'] || '',
+                variationName: r['Variation Name'] || r['variationName'] || r['variation'] || '',
                 barcode: r['Barcode'] || r['barcode'] || '',
                 categoryName: r['Category Name'] || r['category'] || '',
                 costPrice: parseFloat(r['Cost Price'] || r['costPrice'] || r['cost'] || 0),
