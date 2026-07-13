@@ -197,6 +197,29 @@ const initDB = async () => {
     val TEXT
   )`);
 
+  // Create Coupons and Expenses tables
+  await dbQuery(`CREATE TABLE IF NOT EXISTS coupons (
+    code VARCHAR(50) PRIMARY KEY,
+    discountType VARCHAR(50) NOT NULL,
+    discountValue DECIMAL(10,2) NOT NULL
+  )`);
+
+  await dbQuery(`CREATE TABLE IF NOT EXISTS expenses (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    date DATETIME NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    note TEXT
+  )`);
+
+  // Seed default coupons if empty
+  const couponsCount = await dbQuery(`SELECT COUNT(*) as count FROM coupons`);
+  if (couponsCount[0].count === 0) {
+    await dbQuery(`INSERT INTO coupons (code, discountType, discountValue) VALUES 
+      ('WELCOME10', 'percentage', 10.00),
+      ('SAVE50', 'amount', 50.00)`);
+  }
+
   const settingsCount = await dbQuery(`SELECT COUNT(*) as count FROM settings`);
   if (settingsCount[0].count === 0) {
     await dbQuery(`INSERT INTO settings (key_name, val) VALUES 
@@ -343,6 +366,76 @@ app.put('/api/settings', verifyRole(['admin', 'manager']), async (req, res) => {
   }
 });
 
+// Coupons
+app.get('/api/coupons', async (req, res) => {
+  try {
+    const rows = await dbQuery(`SELECT * FROM coupons ORDER BY code`);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/coupons', verifyRole(['admin']), async (req, res) => {
+  try {
+    const { code, discountType, discountValue } = req.body;
+    if (!code || !discountType || discountValue === undefined) {
+      return res.status(400).json({ error: 'Missing coupon fields' });
+    }
+    const cleanCode = code.trim().toUpperCase();
+    await dbQuery(`INSERT INTO coupons (code, discountType, discountValue) VALUES (?, ?, ?)`,
+      [cleanCode, discountType, discountValue]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/coupons/:code', verifyRole(['admin']), async (req, res) => {
+  try {
+    const code = req.params.code.toUpperCase();
+    await dbQuery(`DELETE FROM coupons WHERE code = ?`, [code]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Expenses
+app.get('/api/expenses', async (req, res) => {
+  try {
+    const rows = await dbQuery(`SELECT id, name, DATE_FORMAT(date, '%Y-%m-%dT%H:%i:%s.000Z') as date, amount, note FROM expenses ORDER BY date DESC`);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/expenses', async (req, res) => {
+  try {
+    const { id, name, date, amount, note } = req.body;
+    if (!name || !date || amount === undefined) {
+      return res.status(400).json({ error: 'Missing expense fields' });
+    }
+    const formattedDate = new Date(date).toISOString().slice(0, 19).replace('T', ' ');
+    await dbQuery(`INSERT INTO expenses (id, name, date, amount, note) VALUES (?, ?, ?, ?, ?)`,
+      [id || 'exp_' + Math.random().toString(36).substr(2, 9), name, formattedDate, amount, note || '']);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/expenses/:id', verifyRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const eid = req.params.id;
+    await dbQuery(`DELETE FROM expenses WHERE id = ?`, [eid]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Users Management (Admin Only)
 app.get('/api/users', verifyRole(['admin']), async (req, res) => {
   try {
@@ -467,6 +560,55 @@ app.post('/api/products', verifyRole(['admin', 'manager']), async (req, res) => 
         await dbQuery(`INSERT INTO variations (id, productId, name, sku, barcode, price, costPrice, stock) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [v.id, id, v.name, v.sku, v.barcode, v.price, v.costPrice, v.stock]);
+      }
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/products/bulk', verifyRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const products = req.body;
+    if (!Array.isArray(products)) {
+      return res.status(400).json({ error: 'Body must be an array of products' });
+    }
+
+    for (const item of products) {
+      const { name, sku, barcode, categoryName, costPrice, sellingPrice, stock, alertQty } = item;
+      if (!name || !sku) continue;
+
+      // Check/Create category
+      let categoryId = 'cat-uncategorized';
+      if (categoryName) {
+        const catRows = await dbQuery(`SELECT id FROM categories WHERE name = ?`, [categoryName]);
+        if (catRows.length > 0) {
+          categoryId = catRows[0].id;
+        } else {
+          categoryId = 'cat_' + Math.random().toString(36).substr(2, 9);
+          await dbQuery(`INSERT INTO categories (id, name) VALUES (?, ?)`, [categoryId, categoryName]);
+        }
+      }
+
+      // Check if product or variation SKU exists
+      const prodRows = await dbQuery(`SELECT id FROM products WHERE sku = ?`, [sku]);
+      if (prodRows.length > 0) {
+        const pid = prodRows[0].id;
+        await dbQuery(`UPDATE products SET name = ?, barcode = ?, categoryId = ?, costPrice = ?, sellingPrice = ?, stock = ?, alertQty = ? WHERE id = ?`,
+          [name, barcode || null, categoryId, costPrice || 0, sellingPrice || 0, stock || 0, alertQty || 0, pid]);
+      } else {
+        const varRows = await dbQuery(`SELECT id, productId FROM variations WHERE sku = ?`, [sku]);
+        if (varRows.length > 0) {
+          const vid = varRows[0].id;
+          await dbQuery(`UPDATE variations SET name = ?, barcode = ?, price = ?, costPrice = ?, stock = ? WHERE id = ?`,
+            [name, barcode || null, sellingPrice || 0, costPrice || 0, stock || 0, vid]);
+        } else {
+          const newPid = 'prod_' + Math.random().toString(36).substr(2, 9);
+          await dbQuery(`INSERT INTO products (id, name, sku, barcode, categoryId, costPrice, sellingPrice, stock, alertQty, image) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '')`,
+            [newPid, name, sku, barcode || null, categoryId, costPrice || 0, sellingPrice || 0, stock || 0, alertQty || 0]);
+        }
       }
     }
     res.json({ success: true });
