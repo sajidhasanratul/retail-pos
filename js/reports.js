@@ -13,7 +13,8 @@
         'slow-selling': 'Slow Selling Products Report',
         'payment-method': 'Payment Method Report',
         'stock-value': 'Stock Value Report',
-        'sales-summary': 'Sales Summary Report'
+        'sales-summary': 'Sales Summary Report',
+        'overall-profit': 'Overall Profit Report'
       };
 
       const title = titleMap[type] || 'Reports Overview';
@@ -95,6 +96,9 @@
           break;
         case 'sales-summary':
           this.salesSummaryReport(container, orders, H);
+          break;
+        case 'overall-profit':
+          await this.overallProfitReport(container, orders, orderItems, products, S, H, from, to);
           break;
         default:
           container.innerHTML = `<div class="card"><div class="card-body">Please select a valid report option from the sidebar menu.</div></div>`;
@@ -543,6 +547,128 @@
       `;
     },
 
+    async overallProfitReport(container, orders, orderItems, products, Store, H, from, to) {
+      const totalSales = orders.reduce((s, o) => s + (parseFloat(o.grandTotal) || 0), 0);
+      let totalCostOfGoods = 0;
+      orders.forEach(order => {
+        const items = orderItems.filter(i => i.orderId === order.id);
+        items.forEach(item => {
+          const product = products.find(p => p.id === item.productId);
+          let cost = 0;
+          if (product) {
+            if (product.variations && product.variations.length > 0) {
+              const variant = product.variations.find(v => v.name === item.variationName || (product.name + ' ' + v.name) === item.productName);
+              cost = variant ? variant.costPrice : product.costPrice;
+            } else {
+              cost = product.costPrice;
+            }
+          }
+          totalCostOfGoods += (parseFloat(cost) || 0) * (parseInt(item.qty) || 0);
+        });
+      });
+
+      const totalSubtotal = orders.reduce((s, o) => s + (parseFloat(o.subtotal) || 0), 0);
+      const totalDiscount = orders.reduce((s, o) => s + (parseFloat(o.discountAmount) || 0), 0);
+      const productProfit = totalSubtotal - totalCostOfGoods - totalDiscount;
+
+      const expenses = await Store.query('expenses', e => H.isDateInRange(e.date, from, to));
+      const totalExpenses = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+      const overallNetProfit = productProfit - totalExpenses;
+
+      const netProfitColor = overallNetProfit >= 0 ? 'text-success' : 'text-danger';
+
+      container.innerHTML = `
+        <div class="stats-grid fade-in mb-2" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="stat-card purple" style="padding: 15px;">
+            <div class="stat-icon">💰</div>
+            <div class="stat-info">
+              <div class="stat-label">Total Sales</div>
+              <div class="stat-value" style="font-size:16px;">${H.formatCurrency(totalSales)}</div>
+              <div class="stat-sub">${orders.length} Invoice(s)</div>
+            </div>
+          </div>
+          <div class="stat-card green" style="padding: 15px;">
+            <div class="stat-icon">📈</div>
+            <div class="stat-info">
+              <div class="stat-label">Product Profit</div>
+              <div class="stat-value" style="font-size:16px;">${H.formatCurrency(productProfit)}</div>
+              <div class="stat-sub">From Catalog Sales</div>
+            </div>
+          </div>
+          <div class="stat-card orange" style="padding: 15px;">
+            <div class="stat-icon">💸</div>
+            <div class="stat-info">
+              <div class="stat-label">Total Expenses</div>
+              <div class="stat-value" style="font-size:16px;">${H.formatCurrency(totalExpenses)}</div>
+              <div class="stat-sub">${expenses.length} Expense logs</div>
+            </div>
+          </div>
+          <div class="stat-card blue" style="padding: 15px;">
+            <div class="stat-icon">⚖️</div>
+            <div class="stat-info">
+              <div class="stat-label">Overall Net Profit</div>
+              <div class="stat-value ${netProfitColor}" style="font-size:16px; font-weight:800;">${H.formatCurrency(overallNetProfit)}</div>
+              <div class="stat-sub">Profit minus Expenses</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2 fade-in mt-3">
+          <div class="card">
+            <div class="card-header">💸 Shop Expenses Breakdown</div>
+            <div class="card-body">
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Expense Name</th>
+                      <th class="text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${expenses.map(e => `
+                      <tr>
+                        <td>${H.formatDateTime(e.date)}</td>
+                        <td>${H.esc(e.name)}</td>
+                        <td class="text-right text-danger">${H.formatCurrency(e.amount)}</td>
+                      </tr>
+                    `).join('') || '<tr><td colspan="3" class="text-center text-muted">No expenses in this period.</td></tr>'}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">📋 Invoiced Sales Summary</div>
+            <div class="card-body">
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Invoice ID</th>
+                      <th>Customer</th>
+                      <th class="text-right">Grand Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${orders.map(o => `
+                      <tr>
+                        <td style="font-weight:700;">${o.invoiceId}</td>
+                        <td>${H.esc(o.customerName)}</td>
+                        <td class="text-right text-success" style="font-weight:700;">${H.formatCurrency(o.grandTotal)}</td>
+                      </tr>
+                    `).join('') || '<tr><td colspan="3" class="text-center text-muted">No sales orders in this period.</td></tr>'}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    },
+
     async exportReportCSV(type, from, to) {
       const S = POS.Store;
       const H = POS.Helpers;
@@ -574,24 +700,26 @@
         const items = orderItems.filter(i => orderIds.includes(i.orderId));
         const profitByProduct = {};
         items.forEach(item => {
-          const prod = products.find(p => p.id === item.productId);
-          let costPrice = 0;
-          if (prod) {
-            if (prod.variations && prod.variations.length > 0) {
-              const v = prod.variations.find(v => v.name === item.variationName || (prod.name + ' ' + v.name) === item.productName);
-              costPrice = v ? v.costPrice : prod.costPrice;
+          const product = products.find(p => p.id === item.productId);
+          let cost = 0;
+          if (product) {
+            if (product.variations && product.variations.length > 0) {
+              const variant = product.variations.find(v => v.name === item.variationName || (product.name + ' ' + v.name) === item.productName);
+              cost = variant ? variant.costPrice : product.costPrice;
             } else {
-              costPrice = prod.costPrice;
+              cost = product.costPrice;
             }
           }
-          const key = item.productId + '_' + (item.variationName || '');
+          const totalCost = cost * item.qty;
+          const revenue = item.total;
+          const key = item.productName + (item.variationName ? ` (${item.variationName})` : '');
           if (!profitByProduct[key]) {
-            profitByProduct[key] = { Product: item.productName + (item.variationName ? ` (${item.variationName})` : ''), Qty: 0, Cost: 0, Revenue: 0, Profit: 0 };
+            profitByProduct[key] = { Product: key, Sold: 0, Cost: 0, Sales: 0, Profit: 0 };
           }
-          profitByProduct[key].Qty += item.qty;
-          profitByProduct[key].Cost += (costPrice * item.qty);
-          profitByProduct[key].Revenue += item.total;
-          profitByProduct[key].Profit = profitByProduct[key].Revenue - profitByProduct[key].Cost;
+          profitByProduct[key].Sold += item.qty;
+          profitByProduct[key].Cost += totalCost;
+          profitByProduct[key].Sales += revenue;
+          profitByProduct[key].Profit += (revenue - totalCost);
         });
         csvData = Object.values(profitByProduct);
       } else if (type === 'top-selling' || type === 'slow-selling') {
@@ -600,28 +728,34 @@
         const totals = {};
         items.forEach(i => {
           const key = i.productName + (i.variationName ? ` (${i.variationName})` : '');
-          if (!totals[key]) totals[key] = { Product: key, Qty: 0, Amount: 0 };
-          totals[key].Qty += i.qty;
-          totals[key].Amount += i.total;
+          if (!totals[key]) {
+            totals[key] = { Product: key, Sold: 0, Revenue: 0 };
+          }
+          totals[key].Sold += i.qty;
+          totals[key].Revenue += i.total;
         });
-        csvData = Object.values(totals).sort((a, b) => type === 'top-selling' ? b.Qty - a.Qty : a.Qty - b.Qty);
+        csvData = Object.values(totals).sort((a, b) => type === 'top-selling' ? b.Sold - a.Sold : a.Sold - b.Sold);
       } else if (type === 'payment-method') {
         const methods = {};
-        H.paymentMethods.forEach(m => { methods[m] = { 'Payment Method': m, Transactions: 0, Amount: 0 }; });
+        H.paymentMethods.forEach(m => { methods[m] = { Method: m, Txns: 0, Amount: 0 }; });
         const orderIds = orders.map(o => o.id);
-        payments.filter(p => orderIds.includes(p.orderId)).forEach(p => {
-          methods[p.method].Transactions++;
+        const matchedPayments = payments.filter(p => orderIds.includes(p.orderId));
+        matchedPayments.forEach(p => {
+          if (!methods[p.method]) {
+            methods[p.method] = { Method: p.method, Txns: 0, Amount: 0 };
+          }
+          methods[p.method].Txns++;
           methods[p.method].Amount += p.amount;
         });
-        csvData = Object.values(methods).filter(d => d.Amount > 0);
+        csvData = Object.values(methods).filter(m => m.Amount > 0);
       } else if (type === 'stock-value') {
         products.forEach(p => {
           const cat = categories.find(c => c.id === p.categoryId);
-          const catName = cat ? cat.name : 'N/A';
+          const catName = cat ? cat.name : 'Uncategorized';
           if (p.variations && p.variations.length > 0) {
             p.variations.forEach(v => {
               csvData.push({
-                Product: p.name + ` (${v.name})`,
+                Product: p.name,
                 SKU: v.sku,
                 Category: catName,
                 Stock: v.stock,
@@ -660,6 +794,41 @@
           'Total Settled': totalPaid,
           'Total Due': totalDue,
           'Total Refunded': totalReturned
+        }];
+      } else if (type === 'overall-profit') {
+        const totalSales = orders.reduce((s, o) => s + (parseFloat(o.grandTotal) || 0), 0);
+        let totalCostOfGoods = 0;
+        orders.forEach(order => {
+          const items = orderItems.filter(i => i.orderId === order.id);
+          items.forEach(item => {
+            const product = products.find(p => p.id === item.productId);
+            let cost = 0;
+            if (product) {
+              if (product.variations && product.variations.length > 0) {
+                const variant = product.variations.find(v => v.name === item.variationName || (product.name + ' ' + v.name) === item.productName);
+                cost = variant ? variant.costPrice : product.costPrice;
+              } else {
+                cost = product.costPrice;
+              }
+            }
+            totalCostOfGoods += (parseFloat(cost) || 0) * (parseInt(item.qty) || 0);
+          });
+        });
+        const totalSubtotal = orders.reduce((s, o) => s + (parseFloat(o.subtotal) || 0), 0);
+        const totalDiscount = orders.reduce((s, o) => s + (parseFloat(o.discountAmount) || 0), 0);
+        const productProfit = totalSubtotal - totalCostOfGoods - totalDiscount;
+
+        const expenses = await S.query('expenses', e => H.isDateInRange(e.date, from, to));
+        const totalExpenses = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+        const overallNetProfit = productProfit - totalExpenses;
+
+        csvData = [{
+          'Total Sales': totalSales,
+          'Product Profit': productProfit,
+          'Total Expenses': totalExpenses,
+          'Overall Net Profit': overallNetProfit,
+          'Sales Invoices Qty': orders.length,
+          'Expense Items Qty': expenses.length
         }];
       }
 
