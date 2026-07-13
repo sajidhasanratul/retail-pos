@@ -6,6 +6,7 @@
       const mc = document.getElementById('main-content');
       const S = POS.Store;
       const H = POS.Helpers;
+      const user = S.getCurrentUser();
 
       const today = H.today();
       let fromDate = localStorage.getItem('exp_from') || today;
@@ -18,6 +19,9 @@
             <p class="page-subtitle">Track operation fees, rent, payrolls, and print details.</p>
           </div>
           <div class="page-actions">
+            ${user && (user.role === 'admin' || user.role === 'manager') ? `
+              <button class="btn btn-secondary btn-sm" id="btn-manage-categories" style="margin-right:8px;">📂 Manage Categories</button>
+            ` : ''}
             <button class="btn btn-primary btn-sm" id="btn-add-expense">+ Add Expense</button>
           </div>
         </div>
@@ -72,6 +76,11 @@
       `;
 
       document.getElementById('btn-add-expense').onclick = () => this.showAddModal();
+      const manageBtn = document.getElementById('btn-manage-categories');
+      if (manageBtn) {
+        manageBtn.onclick = () => this.showCategoriesModal();
+      }
+
       document.getElementById('btn-filter-expenses').onclick = async () => {
         fromDate = document.getElementById('exp-from').value;
         toDate = document.getElementById('exp-to').value;
@@ -103,14 +112,11 @@
         return;
       }
 
-      const catColors = {
-        Utilities: 'background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;',
-        Salaries: 'background: #faf5ff; color: #6b21a8; border: 1px solid #e9d5ff;',
-        Rent: 'background: #fdf2f8; color: #9d174d; border: 1px solid #fbcfe8;',
-        Inventory: 'background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0;',
-        Marketing: 'background: #ecfeff; color: #075985; border: 1px solid #cffafe;',
-        Maintenance: 'background: #fffbeb; color: #92400e; border: 1px solid #fef3c7;',
-        Other: 'background: #f8fafc; color: #334155; border: 1px solid #e2e8f0;'
+      // Dynamic color assignments helper
+      const getCategoryBadgeStyle = (cat) => {
+        const hash = [...(cat || 'Other')].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const hue = hash % 360;
+        return `background: hsl(${hue}, 80%, 96%); color: hsl(${hue}, 80%, 25%); border: 1px solid hsl(${hue}, 80%, 85%);`;
       };
 
       list.forEach(e => {
@@ -121,7 +127,7 @@
           ? `<img src="${e.image}" style="width:36px; height:36px; border-radius:6px; object-fit:cover; border: 1px solid var(--border);" alt="${H.esc(e.name)}">`
           : `<div style="width:36px; height:36px; border-radius:6px; background:var(--bg); border: 1px dashed var(--border); display:flex; align-items:center; justify-content:center; font-size:16px;">💸</div>`;
 
-        const catStyle = catColors[e.category] || catColors['Other'];
+        const catStyle = getCategoryBadgeStyle(e.category);
         const statusBadge = e.status === 'Paid'
           ? `<span class="badge badge-success">Paid</span>`
           : `<span class="badge badge-warning">Pending</span>`;
@@ -161,7 +167,7 @@
       countEl.textContent = `${list.length} record(s)`;
     },
 
-    showAddModal() {
+    async showAddModal() {
       const S = POS.Store;
       const H = POS.Helpers;
       const modalOverlay = document.getElementById('global-modal-overlay');
@@ -173,6 +179,10 @@
       const defaultDateTime = localNow.toISOString().slice(0, 16);
 
       let imageBase64 = '';
+
+      // Fetch dynamic categories
+      const categories = await S.getAll('expense-categories');
+      const catOptions = categories.map(c => `<option value="${H.esc(c.name)}">${H.esc(c.name)}</option>`).join('');
 
       modalOverlay.innerHTML = `
         <div class="modal animate" style="max-width: 450px;">
@@ -189,13 +199,7 @@
             <div class="form-group mb-2">
               <label class="form-label">Category</label>
               <select class="form-select" id="exp-category">
-                <option value="Utilities">Utilities (Electricity, Water, Internet)</option>
-                <option value="Rent">Shop Rent</option>
-                <option value="Salaries">Staff Salaries</option>
-                <option value="Inventory">Inventory Purchase</option>
-                <option value="Marketing">Marketing / Advertising</option>
-                <option value="Maintenance">Shop Maintenance</option>
-                <option value="Other" selected>Other / Miscellaneous</option>
+                ${catOptions || '<option value="Other">Other / Miscellaneous</option>'}
               </select>
             </div>
 
@@ -299,6 +303,96 @@
           await this.updateList(from, to);
         }
       };
+    },
+
+    async showCategoriesModal() {
+      const S = POS.Store;
+      const H = POS.Helpers;
+      const modalOverlay = document.getElementById('global-modal-overlay');
+      if (!modalOverlay) return;
+
+      const renderModalContent = async () => {
+        const categories = await S.getAll('expense-categories');
+
+        modalOverlay.innerHTML = `
+          <div class="modal animate" style="max-width: 420px;">
+            <div class="modal-header">
+              <h3>📂 Manage Expense Categories</h3>
+              <button class="modal-close" id="modal-close-categories">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+              <div style="display:flex; gap:8px; margin-bottom:16px;">
+                <input type="text" class="form-input" id="new-exp-cat-name" placeholder="New Category Name..." style="flex:1;">
+                <button class="btn btn-primary" id="btn-add-exp-cat" style="white-space:nowrap;">+ Add</button>
+              </div>
+
+              <div style="font-weight:700; margin-bottom:8px; font-size:12px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">Categories List</div>
+              <div style="display:flex; flex-direction:column; gap:6px;" id="exp-cats-list">
+                ${categories.map(c => `
+                  <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:var(--bg); border:1px solid var(--border-light); border-radius:6px;">
+                    <span style="font-weight:600; color:var(--text-dark);">${H.esc(c.name)}</span>
+                    <button class="btn btn-danger btn-xs btn-delete-exp-cat" data-id="${H.esc(c.id)}" data-name="${H.esc(c.name)}">🗑️ Delete</button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" id="btn-categories-close-footer">Close</button>
+            </div>
+          </div>
+        `;
+
+        const close = () => modalOverlay.classList.remove('active');
+        modalOverlay.querySelector('#modal-close-categories').onclick = close;
+        modalOverlay.querySelector('#btn-categories-close-footer').onclick = close;
+
+        modalOverlay.querySelector('#btn-add-exp-cat').onclick = async () => {
+          const name = document.getElementById('new-exp-cat-name').value.trim();
+          if (!name) {
+            H.showToast('Please enter a category name', 'warning');
+            return;
+          }
+
+          const alreadyExists = categories.some(c => c.name.toLowerCase() === name.toLowerCase());
+          if (alreadyExists) {
+            H.showToast('Category already exists', 'error');
+            return;
+          }
+
+          const res = await S.add('expense-categories', {
+            id: 'exp_cat_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            name
+          });
+
+          if (res) {
+            H.showToast('Category added successfully!');
+            await renderModalContent();
+          }
+        };
+
+        modalOverlay.querySelectorAll('.btn-delete-exp-cat').forEach(btn => {
+          btn.onclick = async () => {
+            const id = btn.dataset.id;
+            const name = btn.dataset.name;
+
+            if (categories.length <= 1) {
+              H.showToast('You must keep at least one category.', 'warning');
+              return;
+            }
+
+            if (await H.confirm(`Are you sure you want to delete the category "${name}"? Expenses under this category will display as "Other".`)) {
+              const ok = await S.delete('expense-categories', id);
+              if (ok) {
+                H.showToast('Category removed successfully.');
+                await renderModalContent();
+              }
+            }
+          };
+        });
+      };
+
+      await renderModalContent();
+      modalOverlay.classList.add('active');
     }
   };
 
