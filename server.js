@@ -1098,6 +1098,11 @@ app.post('/api/backup/import', verifyRole(['admin']), async (req, res) => {
   }
 });
 
+// Wildcard fallback for HTML5 History API routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // Listener
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
