@@ -767,7 +767,7 @@
       if (result.success) {
         H.showToast(`Order ${invoiceId} updated successfully!`);
         if (await H.confirm('Would you like to print the receipt?')) {
-          await this.printInvoice(order, this.cart);
+          H.printOrder(order, this.cart);
         }
         POS.Router.navigate('/sales-list');
       } else {
@@ -776,65 +776,8 @@
     },
 
     async printInvoice(order, cartItems) {
-      const S = POS.Store;
       const H = POS.Helpers;
-      const settings = await S.getSettings();
-      let itemsHtml = '';
-      cartItems.forEach(item => {
-        itemsHtml += `
-          <tr>
-            <td>${H.esc(item.productName)} ${item.variationName ? `<br><small style="color:#555">${H.esc(item.variationName)}</small>` : ''}</td>
-            <td class="text-center">${item.qty}</td>
-            <td class="text-right">${H.formatCurrency(item.unitPrice)}</td>
-            <td class="text-right">${H.formatCurrency(item.unitPrice * item.qty)}</td>
-          </tr>
-        `;
-      });
-
-      const html = `
-        <div class="thermal-receipt ${settings.invoice_style || 'style-1'}">
-          <div style="text-align: center; margin-bottom: 8px;">
-            <h3 style="margin:0; font-size:16px;">🏪 ${H.esc(settings.store_name || 'ZenPos')}</h3>
-            <p style="font-size:10px; margin: 2px 0 0 0;">${H.esc(settings.store_address || '')}</p>
-            <p style="font-size:10px; margin: 1px 0 0 0;">Phone: ${H.esc(settings.store_phone || '')}</p>
-          </div>
-          <hr>
-          <div style="font-size: 10px; line-height: 1.4; margin-bottom: 6px;">
-            <div><strong>Invoice ID:</strong> ${order.invoiceId}</div>
-            <div><strong>Customer:</strong> ${H.esc(order.customerName)} (${H.esc(order.customerPhone)})</div>
-            <div><strong>Date:</strong> ${H.formatDateTime(order.date)}</div>
-          </div>
-          <hr>
-          <table style="width:100%;">
-            <thead>
-              <tr>
-                <th style="text-align:left;">Item</th>
-                <th style="text-align:center; width:40px;">Qty</th>
-                <th style="text-align:right; width:60px;">Price</th>
-                <th style="text-align:right; width:70px;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-          </table>
-          
-          <div class="totals" style="font-size: 11px;">
-            <p>Sub Total: <strong>${H.formatCurrency(order.subtotal)}</strong></p>
-            ${order.discountAmount > 0 ? `<p>Discount: <strong style="color:#000">-${H.formatCurrency(order.discountAmount)}</strong></p>` : ''}
-            ${order.taxAmount > 0 ? `<p>Tax (${order.taxPercent}%): <strong>${H.formatCurrency(order.taxAmount)}</strong></p>` : ''}
-            <p style="font-size:13px; font-weight:800; border-top:1px dashed #000; padding-top:4px; margin-top:4px;">Grand Total: <span>${H.formatCurrency(order.grandTotal)}</span></p>
-            <p>Paid Amount: <strong>${H.formatCurrency(order.paidAmount)}</strong></p>
-          </div>
-          
-          <div style="text-align: center; margin-top: 25px; font-size: 10px;">
-            <p>Thank you for shopping with us!</p>
-            <p style="font-size: 9px; margin-top:4px; color:#555;">Software by Zen IT</p>
-          </div>
-        </div>
-      `;
-
-      H.printHTML(html, `Invoice ${order.invoiceId}`);
+      H.printOrder(order, cartItems);
     }
   };
 
