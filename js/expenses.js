@@ -268,12 +268,17 @@
         const dateInput = document.getElementById('exp-datetime').value;
         const note = document.getElementById('exp-note').value.trim();
 
-        if (!name || !dateInput || amount <= 0) {
-          H.showToast('Please fill out all fields with valid values.', 'error');
+        if (!name || amount <= 0) {
+          H.showToast('Please enter a valid expense title and amount.', 'error');
           return;
         }
 
-        const date = new Date(dateInput).toISOString();
+        let date = '';
+        try {
+          date = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
+        } catch (e) {
+          date = new Date().toISOString();
+        }
 
         const res = await S.add('expenses', {
           id: 'exp_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
