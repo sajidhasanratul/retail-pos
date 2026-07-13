@@ -92,7 +92,7 @@
 
     async getById(collection, id) {
       const list = await this.getAll(collection);
-      return list.find(item => item.id === id) || null;
+      return list.find(item => item.id === id || item.code === id) || null;
     },
 
     async add(collection, item) {
