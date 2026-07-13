@@ -18,7 +18,12 @@
             <h2 class="page-title">📦 Product Catalog</h2>
             <p class="page-subtitle">Add variations (colors, sizes), track individual costs, barcode identifiers, and adjust inventory.</p>
           </div>
-          <div class="page-actions" style="display:flex; gap:8px;">
+          <div class="page-actions" style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-secondary btn-sm" id="btn-export-csv">📥 Export CSV</button>
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer; margin-bottom:0; display:inline-flex; align-items:center; height:34px; padding:0 12px; font-weight:600; font-size:12px; border-radius:var(--radius-sm);">
+              📤 Import CSV
+              <input type="file" id="file-import-csv" accept=".csv" style="display:none;">
+            </label>
             <button class="btn btn-secondary btn-sm" id="btn-manage-categories">📁 Categories</button>
             <button class="btn btn-primary btn-sm" id="btn-add-product">+ Add Product</button>
           </div>
@@ -45,6 +50,98 @@
       // Event handlers
       document.getElementById('btn-add-product').onclick = () => this.showAddEditModal(null);
       document.getElementById('btn-manage-categories').onclick = () => this.showManageCategoriesModal();
+
+      document.getElementById('btn-export-csv').onclick = async () => {
+        const list = await S.getAll('products');
+        const categoriesList = await S.getAll('categories');
+        const csvData = [];
+
+        list.forEach(p => {
+          const cat = categoriesList.find(c => c.id === p.categoryId);
+          const catName = cat ? cat.name : 'Uncategorized';
+
+          if (p.variations && p.variations.length > 0) {
+            p.variations.forEach(v => {
+              csvData.push({
+                'Product Name': p.name + ` (${v.name})`,
+                'SKU': v.sku,
+                'Barcode': v.barcode || '',
+                'Category Name': catName,
+                'Cost Price': v.costPrice,
+                'Selling Price': v.price,
+                'Alert Qty': p.alertQty,
+                'Stock': v.stock
+              });
+            });
+          } else {
+            csvData.push({
+              'Product Name': p.name,
+              'SKU': p.sku,
+              'Barcode': p.barcode || '',
+              'Category Name': catName,
+              'Cost Price': p.costPrice,
+              'Selling Price': p.sellingPrice,
+              'Alert Qty': p.alertQty,
+              'Stock': p.stock
+            });
+          }
+        });
+
+        H.exportCSV(csvData, 'zenpos_products_catalog');
+      };
+
+      document.getElementById('file-import-csv').onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          try {
+            const csvText = ev.target.result;
+            const rows = H.parseCSV(csvText);
+            if (rows.length === 0) {
+              H.showToast('CSV is empty or invalid', 'error');
+              return;
+            }
+
+            const productsToImport = rows.map(r => {
+              return {
+                name: r['Product Name'] || r['name'] || r['Product'] || '',
+                sku: r['SKU'] || r['sku'] || '',
+                barcode: r['Barcode'] || r['barcode'] || '',
+                categoryName: r['Category Name'] || r['category'] || '',
+                costPrice: parseFloat(r['Cost Price'] || r['costPrice'] || r['cost'] || 0),
+                sellingPrice: parseFloat(r['Selling Price'] || r['sellingPrice'] || r['price'] || 0),
+                alertQty: parseInt(r['Alert Qty'] || r['alertQty'] || 0),
+                stock: parseFloat(r['Stock'] || r['stock'] || 0)
+              };
+            }).filter(item => item.name && item.sku);
+
+            if (productsToImport.length === 0) {
+              H.showToast('No valid product rows with Name and SKU found', 'error');
+              return;
+            }
+
+            const res = await fetch(`${window.location.origin}/api/products/bulk`, {
+              method: 'POST',
+              headers: S.getHeaders(),
+              body: JSON.stringify(productsToImport)
+            });
+
+            if (res.ok) {
+              H.showToast(`Imported ${productsToImport.length} products successfully!`);
+              await this.render();
+            } else {
+              const err = await res.json();
+              H.showToast(err.error || 'Import failed', 'error');
+            }
+          } catch (err) {
+            console.error('Import Error:', err);
+            H.showToast('Invalid CSV file format', 'error');
+          }
+        };
+        reader.readAsText(file);
+      };
 
       document.getElementById('prod-search').oninput = H.debounce(async (e) => {
         searchQuery = e.target.value.toLowerCase().trim();
