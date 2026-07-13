@@ -69,6 +69,49 @@
       URL.revokeObjectURL(url);
     },
 
+    parseCSV(text) {
+      if (!text) return [];
+      const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+      if (lines.length === 0) return [];
+
+      const parseLine = (line) => {
+        const result = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            result.push(cur.trim());
+            cur = '';
+          } else {
+            cur += char;
+          }
+        }
+        result.push(cur.trim());
+        return result;
+      };
+
+      const headers = parseLine(lines[0]);
+      const list = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseLine(lines[i]);
+        if (values.length < headers.length) continue;
+        const obj = {};
+        headers.forEach((h, idx) => {
+          obj[h] = values[idx] ?? '';
+        });
+        list.push(obj);
+      }
+      return list;
+    },
+
     /* ── Print ─────────────────────────────────────── */
     printHTML(html, title) {
       const w = window.open('', '_blank', 'width=800,height=600');
