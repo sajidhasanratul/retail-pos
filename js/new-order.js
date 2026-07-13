@@ -82,7 +82,7 @@
             <!-- Discount & Tax -->
             <div class="card">
               <div class="card-header">💸 Discount & Tax Settings</div>
-              <div class="card-body form-row">
+              <div class="card-body form-row" style="grid-template-columns: repeat(4, 1fr);">
                 <div class="form-group">
                   <label class="form-label">Discount Type</label>
                   <select class="form-select" id="discount-type">
@@ -94,6 +94,13 @@
                 <div class="form-group">
                   <label class="form-label">Discount Value</label>
                   <input type="number" class="form-input" id="discount-value" value="0" min="0" disabled>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Promo Coupon</label>
+                  <div style="display:flex; gap:4px;">
+                    <input type="text" class="form-input" id="coupon-code" placeholder="e.g. SAVE10" style="text-transform:uppercase;">
+                    <button class="btn btn-secondary" id="btn-apply-coupon" style="padding:0 12px; font-size:12px; font-weight:700;">Apply</button>
+                  </div>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Tax (%)</label>
@@ -339,6 +346,27 @@
 
       discVal.oninput = () => this.recalculate();
       taxPercent.oninput = () => this.recalculate();
+
+      // Apply Coupon
+      document.getElementById('btn-apply-coupon').onclick = async () => {
+        const codeInput = document.getElementById('coupon-code');
+        const code = codeInput.value.trim().toUpperCase();
+        if (!code) {
+          H.showToast('Please enter a coupon code', 'warning');
+          return;
+        }
+
+        const coupon = await S.getById('coupons', code);
+        if (coupon) {
+          discType.value = coupon.discountType;
+          discVal.value = coupon.discountValue;
+          discVal.disabled = false;
+          H.showToast(`Coupon "${coupon.code}" applied successfully!`);
+          this.recalculate();
+        } else {
+          H.showToast('Invalid coupon code', 'error');
+        }
+      };
 
       // ── Add Payment Split ────────────────────────────
       document.getElementById('btn-add-payment').onclick = () => {
